@@ -15,21 +15,23 @@ export const useAuth = () => {
   useEffect(() => {
     // Set up auth state listener FIRST
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (event, session) => {
+      (event, session) => {
         setSession(session);
         
         if (session?.user) {
-          // Fetch user profile to get role
-          const { data: profile } = await supabase
-            .from('user_profiles')
-            .select('role')
-            .eq('id', session.user.id)
-            .single();
-          
-          setUser({
-            ...session.user,
-            role: profile?.role
-          });
+          // Defer profile fetching to prevent deadlock
+          setTimeout(async () => {
+            const { data: profile } = await supabase
+              .from('user_profiles')
+              .select('role')
+              .eq('id', session.user.id)
+              .maybeSingle();
+            
+            setUser({
+              ...session.user,
+              role: profile?.role
+            });
+          }, 0);
         } else {
           setUser(null);
         }
@@ -47,7 +49,7 @@ export const useAuth = () => {
           .from('user_profiles')
           .select('role')
           .eq('id', session.user.id)
-          .single();
+          .maybeSingle();
         
         setUser({
           ...session.user,
