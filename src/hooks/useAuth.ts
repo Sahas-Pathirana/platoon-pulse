@@ -19,19 +19,18 @@ export const useAuth = () => {
         setSession(session);
         
         if (session?.user) {
-          // Defer profile fetching to prevent deadlock
-          setTimeout(async () => {
-            const { data: profile } = await supabase
-              .from('user_profiles')
-              .select('role')
-              .eq('id', session.user.id)
-              .maybeSingle();
-            
-            setUser({
-              ...session.user,
-              role: profile?.role
+          // Fetch profile synchronously to handle invalid sessions properly
+          supabase
+            .from('user_profiles')
+            .select('role')
+            .eq('id', session.user.id)
+            .maybeSingle()
+            .then(({ data: profile }) => {
+              setUser({
+                ...session.user,
+                role: profile?.role
+              });
             });
-          }, 0);
         } else {
           setUser(null);
         }
