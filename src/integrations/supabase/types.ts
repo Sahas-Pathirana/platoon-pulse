@@ -746,6 +746,10 @@ export type Database = {
         }
         Returns: Json
       }
+      current_cadet_id: {
+        Args: { user_id?: string }
+        Returns: string
+      }
       get_user_role: {
         Args: { user_id?: string }
         Returns: Database["public"]["Enums"]["user_role"]
