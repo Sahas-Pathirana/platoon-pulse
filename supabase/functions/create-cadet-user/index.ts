@@ -62,7 +62,14 @@ Deno.serve(async (req) => {
     })
 
     if (authError) {
-      throw authError
+      console.error('Auth error:', authError)
+      return new Response(
+        JSON.stringify({ error: authError.message }),
+        { 
+          status: 400, 
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+        }
+      )
     }
 
     // Create the user profile linking to the cadet
@@ -77,12 +84,20 @@ Deno.serve(async (req) => {
       })
 
     if (profileError) {
-      throw profileError
+      console.error('Profile error:', profileError)
+      return new Response(
+        JSON.stringify({ error: profileError.message }),
+        { 
+          status: 400, 
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+        }
+      )
     }
 
     return new Response(
       JSON.stringify({ 
         success: true, 
+        message: 'Cadet account created successfully',
         user: { 
           id: authData.user.id, 
           email: authData.user.email 
