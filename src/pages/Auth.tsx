@@ -21,19 +21,34 @@ const Auth = () => {
     fullName: ''
   });
 
+  // Add redirect for authenticated users  
+  useEffect(() => {
+    if (!loading && user) {
+      console.log('User authenticated, redirecting...', user);
+      if (user.role === 'admin') {
+        navigate('/admin', { replace: true });
+      } else {
+        navigate('/dashboard', { replace: true });
+      }
+    }
+  }, [user, loading, navigate]);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
     
-    const { error } = await signIn(loginForm.email, loginForm.password);
-    
-    if (!error) {
-      // Successful login - redirect to home page which will handle role-based redirect
-      navigate('/', { replace: true });
+    try {
+      const { error } = await signIn(loginForm.email, loginForm.password);
+      
+      if (!error) {
+        // Don't manually navigate, let useAuth handle the redirect
+        console.log('Login successful, waiting for auth state change...');
+      }
+    } catch (err) {
+      console.error('Login error:', err);
+    } finally {
+      setIsLoading(false);
     }
-    
-    setIsLoading(false);
   };
 
   const handleSignup = async (e: React.FormEvent) => {

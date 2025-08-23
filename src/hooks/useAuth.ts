@@ -16,20 +16,30 @@ export const useAuth = () => {
     // Set up auth state listener FIRST
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       (event, session) => {
+        console.log('Auth state change:', event, session?.user?.email);
         setSession(session);
         
         if (session?.user) {
-          // Fetch profile synchronously to handle invalid sessions properly
+          // Fetch profile to get role
           supabase
             .from('user_profiles')
             .select('role')
             .eq('id', session.user.id)
             .maybeSingle()
-            .then(({ data: profile }) => {
-              setUser({
-                ...session.user,
-                role: profile?.role
-              });
+            .then(({ data: profile, error }) => {
+              if (error) {
+                console.error('Error fetching profile:', error);
+                // Default to student role if profile fetch fails
+                setUser({
+                  ...session.user,
+                  role: 'student'
+                });
+              } else {
+                setUser({
+                  ...session.user,
+                  role: profile?.role || 'student'
+                });
+              }
             });
         } else {
           setUser(null);
@@ -39,21 +49,46 @@ export const useAuth = () => {
     );
 
     // THEN check for existing session
-    supabase.auth.getSession().then(async ({ data: { session } }) => {
+    supabase.auth.getSession().then(async ({ data: { session }, error }) => {
+      if (error) {
+        console.error('Session error:', error);
+        setSession(null);
+        setUser(null);
+        setLoading(false);
+        return;
+      }
+      
       setSession(session);
       
       if (session?.user) {
         // Fetch user profile to get role
-        const { data: profile } = await supabase
-          .from('user_profiles')
-          .select('role')
-          .eq('id', session.user.id)
-          .maybeSingle();
-        
-        setUser({
-          ...session.user,
-          role: profile?.role
-        });
+        try {
+          const { data: profile, error: profileError } = await supabase
+            .from('user_profiles')
+            .select('role')
+            .eq('id', session.user.id)
+            .maybeSingle();
+          
+          if (profileError) {
+            console.error('Profile error:', profileError);
+            // Default to student role if profile fetch fails
+            setUser({
+              ...session.user,
+              role: 'student'
+            });
+          } else {
+            setUser({
+              ...session.user,
+              role: profile?.role || 'student'
+            });
+          }
+        } catch (err) {
+          console.error('Unexpected error:', err);
+          setUser({
+            ...session.user,
+            role: 'student'
+          });
+        }
       } else {
         setUser(null);
       }
