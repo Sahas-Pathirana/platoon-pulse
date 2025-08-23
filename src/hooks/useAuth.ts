@@ -13,10 +13,19 @@ export const useAuth = () => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    let isSubscribed = true;
+    let hasInitialized = false;
+    
     // Set up auth state listener FIRST
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       (event, session) => {
-        console.log('Auth state change:', event, session?.user?.email);
+        if (!isSubscribed) return;
+        
+        // Only log on actual changes, not initialization
+        if (hasInitialized) {
+          console.log('Auth state change:', event, session?.user?.email);
+        }
+        
         setSession(session);
         
         if (session?.user) {
@@ -27,6 +36,8 @@ export const useAuth = () => {
             .eq('id', session.user.id)
             .maybeSingle()
             .then(({ data: profile, error }) => {
+              if (!isSubscribed) return;
+              
               if (error) {
                 console.error('Error fetching profile:', error);
                 // Default to student role if profile fetch fails
@@ -40,16 +51,20 @@ export const useAuth = () => {
                   role: profile?.role || 'student'
                 });
               }
+              setLoading(false);
             });
         } else {
           setUser(null);
+          setLoading(false);
         }
-        setLoading(false);
       }
     );
 
-    // THEN check for existing session
+    // THEN check for existing session (only once)
     supabase.auth.getSession().then(async ({ data: { session }, error }) => {
+      if (!isSubscribed) return;
+      hasInitialized = true;
+      
       if (error) {
         console.error('Session error:', error);
         setSession(null);
@@ -58,44 +73,16 @@ export const useAuth = () => {
         return;
       }
       
-      setSession(session);
-      
-      if (session?.user) {
-        // Fetch user profile to get role
-        try {
-          const { data: profile, error: profileError } = await supabase
-            .from('user_profiles')
-            .select('role')
-            .eq('id', session.user.id)
-            .maybeSingle();
-          
-          if (profileError) {
-            console.error('Profile error:', profileError);
-            // Default to student role if profile fetch fails
-            setUser({
-              ...session.user,
-              role: 'student'
-            });
-          } else {
-            setUser({
-              ...session.user,
-              role: profile?.role || 'student'
-            });
-          }
-        } catch (err) {
-          console.error('Unexpected error:', err);
-          setUser({
-            ...session.user,
-            role: 'student'
-          });
-        }
-      } else {
-        setUser(null);
+      // Don't set session here as the auth state listener will handle it
+      if (!session) {
+        setLoading(false);
       }
-      setLoading(false);
     });
 
-    return () => subscription.unsubscribe();
+    return () => {
+      isSubscribed = false;
+      subscription.unsubscribe();
+    };
   }, []);
 
   const signIn = async (email: string, password: string) => {

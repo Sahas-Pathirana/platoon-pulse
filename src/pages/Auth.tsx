@@ -21,17 +21,14 @@ const Auth = () => {
     fullName: ''
   });
 
-  // Add redirect for authenticated users  
-  useEffect(() => {
-    if (!loading && user) {
-      console.log('User authenticated, redirecting...', user);
-      if (user.role === 'admin') {
-        navigate('/admin', { replace: true });
-      } else {
-        navigate('/dashboard', { replace: true });
-      }
+  // Redirect authenticated users - use Navigate component instead of useEffect
+  if (!loading && user) {
+    if (user.role === 'admin') {
+      return <Navigate to="/admin" replace />;
+    } else {
+      return <Navigate to="/dashboard" replace />;
     }
-  }, [user, loading, navigate]);
+  }
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
