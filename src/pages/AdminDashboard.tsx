@@ -41,32 +41,18 @@ const AdminDashboard = () => {
 
       if (cadetError) throw cadetError;
 
-      // Then create the auth account
-      const redirectUrl = `${window.location.origin}/`;
-      
-      const { data: authData, error: authError } = await supabase.auth.admin.createUser({
-        email: newCadet.email,
-        password: newCadet.password,
-        email_confirm: true,
-        user_metadata: {
-          full_name: newCadet.fullName,
+      // Then create the auth account using Edge Function
+      const { data: userData, error: userError } = await supabase.functions.invoke('create-cadet-user', {
+        body: {
+          email: newCadet.email,
+          password: newCadet.password,
+          fullName: newCadet.fullName,
+          cadetId: cadetData.id,
         },
       });
 
-      if (authError) throw authError;
-
-      // Finally, create the user profile linking to the cadet
-      const { error: profileError } = await supabase
-        .from('user_profiles')
-        .insert({
-          id: authData.user.id,
-          email: newCadet.email,
-          full_name: newCadet.fullName,
-          role: 'student',
-          cadet_id: cadetData.id,
-        });
-
-      if (profileError) throw profileError;
+      if (userError) throw userError;
+      if (userData.error) throw new Error(userData.error);
 
       toast({
         title: "Success",
@@ -86,6 +72,12 @@ const AdminDashboard = () => {
     } catch (error: any) {
       // Check if it's a duplicate application number error
       if (error.code === '23505' && error.message?.includes('cadets_application_number_key')) {
+        toast({
+          title: "Duplicate Application Number",
+          description: `Application number "${newCadet.applicationNumber}" already exists. Please use a unique application number.`,
+          variant: "destructive",
+        });
+      } else if (error.code === '23505' && error.message?.includes('application_number')) {
         toast({
           title: "Duplicate Application Number",
           description: `Application number "${newCadet.applicationNumber}" already exists. Please use a unique application number.`,
