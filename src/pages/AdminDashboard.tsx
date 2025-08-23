@@ -84,11 +84,20 @@ const AdminDashboard = () => {
       });
 
     } catch (error: any) {
-      toast({
-        title: "Error",
-        description: error.message || "Failed to create cadet account",
-        variant: "destructive",
-      });
+      // Check if it's a duplicate application number error
+      if (error.code === '23505' && error.message?.includes('cadets_application_number_key')) {
+        toast({
+          title: "Duplicate Application Number",
+          description: `Application number "${newCadet.applicationNumber}" already exists. Please use a unique application number.`,
+          variant: "destructive",
+        });
+      } else {
+        toast({
+          title: "Error",
+          description: error.message || "Failed to create cadet account",
+          variant: "destructive",
+        });
+      }
     } finally {
       setIsLoading(false);
     }
