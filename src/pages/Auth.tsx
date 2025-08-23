@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Navigate } from "react-router-dom";
+import { Navigate, useNavigate } from "react-router-dom";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -9,6 +9,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 const Auth = () => {
   const { user, loading, signIn, signUp } = useAuth();
+  const navigate = useNavigate();
   const [isLoading, setIsLoading] = useState(false);
   const [loginForm, setLoginForm] = useState({
     email: '',
@@ -25,7 +26,12 @@ const Auth = () => {
     e.preventDefault();
     setIsLoading(true);
     
-    await signIn(loginForm.email, loginForm.password);
+    const { error } = await signIn(loginForm.email, loginForm.password);
+    
+    if (!error) {
+      // Successful login - redirect to home page which will handle role-based redirect
+      navigate('/', { replace: true });
+    }
     
     setIsLoading(false);
   };

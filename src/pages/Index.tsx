@@ -29,6 +29,9 @@ const Index = () => {
       return <Navigate to="/admin" replace />;
     } else if (user.role === 'student') {
       return <Navigate to="/dashboard" replace />;
+    } else {
+      // User authenticated but no role assigned - redirect to student dashboard as default
+      return <Navigate to="/dashboard" replace />;
     }
   }
 
