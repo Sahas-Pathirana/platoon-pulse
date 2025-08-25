@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { Navigation } from "@/components/Navigation";
 import { CadetRegistrationForm } from "@/components/CadetRegistrationForm";
+import CadetManagement from "@/components/CadetManagement";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -261,7 +262,8 @@ const AdminDashboard = () => {
         <Tabs defaultValue="create-account" className="w-full">
           <TabsList>
             <TabsTrigger value="create-account">Create Cadet Account</TabsTrigger>
-            <TabsTrigger value="manage-cadets">Manage Cadets</TabsTrigger>
+            <TabsTrigger value="manage-cadets">Basic Cadet Management</TabsTrigger>
+            <TabsTrigger value="cadet-records">Cadet Records Management</TabsTrigger>
             <TabsTrigger value="reports">Reports</TabsTrigger>
           </TabsList>
           
@@ -272,8 +274,8 @@ const AdminDashboard = () => {
           <TabsContent value="manage-cadets">
             <Card>
               <CardHeader>
-                <CardTitle>Manage Cadets</CardTitle>
-                <CardDescription>View and manage existing cadet records</CardDescription>
+                <CardTitle>Basic Cadet Management</CardTitle>
+                <CardDescription>View and manage basic cadet information</CardDescription>
               </CardHeader>
               <CardContent>
                 <div className="space-y-4">
@@ -402,139 +404,98 @@ const AdminDashboard = () => {
                         ))}
                       </TableBody>
                     </Table>
-                    
-                    {cadets.length === 0 && (
-                      <div className="text-center py-8 text-muted-foreground">
-                        No cadets found. Create your first cadet account to get started.
-                      </div>
-                    )}
                   </div>
                 </div>
               </CardContent>
             </Card>
           </TabsContent>
-          
+
+          <TabsContent value="cadet-records">
+            <CadetManagement />
+          </TabsContent>
+
           <TabsContent value="reports">
-            <div className="space-y-6">
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center space-x-2">
-                    <FileText className="h-5 w-5" />
-                    <span>Reports & Analytics</span>
-                  </CardTitle>
-                  <CardDescription>Generate and download various reports</CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                    <Card className="border-2 border-dashed">
-                      <CardHeader className="text-center">
-                        <Users className="h-8 w-8 mx-auto text-primary" />
-                        <CardTitle className="text-lg">Cadet Report</CardTitle>
-                        <CardDescription>Complete list of all cadets with details</CardDescription>
-                      </CardHeader>
-                      <CardContent>
+            <Card>
+              <CardHeader>
+                <CardTitle>Reports</CardTitle>
+                <CardDescription>Generate various reports and analytics</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                  <Card className="cursor-pointer hover:shadow-md transition-shadow">
+                    <CardContent className="p-6 text-center">
+                      <div className="flex flex-col items-center space-y-4">
+                        <div className="p-3 bg-primary/10 rounded-full">
+                          <FileText className="h-8 w-8 text-primary" />
+                        </div>
+                        <div>
+                          <h3 className="font-semibold text-lg">Cadet Report</h3>
+                          <p className="text-sm text-muted-foreground">
+                            Complete list of all cadets with basic information
+                          </p>
+                        </div>
                         <Button 
-                          onClick={() => generateReport('cadets')} 
-                          className="w-full"
+                          className="w-full" 
                           variant="outline"
+                          onClick={() => generateReport('cadets')}
                         >
                           <Download className="h-4 w-4 mr-2" />
-                          Download Report
+                          Generate Report
                         </Button>
-                      </CardContent>
-                    </Card>
+                      </div>
+                    </CardContent>
+                  </Card>
 
-                    <Card className="border-2 border-dashed">
-                      <CardHeader className="text-center">
-                        <Calendar className="h-8 w-8 mx-auto text-primary" />
-                        <CardTitle className="text-lg">Attendance Report</CardTitle>
-                        <CardDescription>Attendance statistics and records</CardDescription>
-                      </CardHeader>
-                      <CardContent>
+                  <Card className="cursor-pointer hover:shadow-md transition-shadow">
+                    <CardContent className="p-6 text-center">
+                      <div className="flex flex-col items-center space-y-4">
+                        <div className="p-3 bg-blue-100 dark:bg-blue-900/20 rounded-full">
+                          <Calendar className="h-8 w-8 text-blue-600 dark:text-blue-400" />
+                        </div>
+                        <div>
+                          <h3 className="font-semibold text-lg">Attendance Report</h3>
+                          <p className="text-sm text-muted-foreground">
+                            Attendance statistics and records
+                          </p>
+                        </div>
                         <Button 
-                          onClick={() => generateReport('attendance')} 
-                          className="w-full"
+                          className="w-full" 
                           variant="outline"
+                          onClick={() => generateReport('attendance')}
                         >
                           <Download className="h-4 w-4 mr-2" />
-                          Download Report
+                          Generate Report
                         </Button>
-                      </CardContent>
-                    </Card>
+                      </div>
+                    </CardContent>
+                  </Card>
 
-                    <Card className="border-2 border-dashed">
-                      <CardHeader className="text-center">
-                        <Award className="h-8 w-8 mx-auto text-primary" />
-                        <CardTitle className="text-lg">Performance Report</CardTitle>
-                        <CardDescription>Performance evaluations and rankings</CardDescription>
-                      </CardHeader>
-                      <CardContent>
+                  <Card className="cursor-pointer hover:shadow-md transition-shadow">
+                    <CardContent className="p-6 text-center">
+                      <div className="flex flex-col items-center space-y-4">
+                        <div className="p-3 bg-green-100 dark:bg-green-900/20 rounded-full">
+                          <Award className="h-8 w-8 text-green-600 dark:text-green-400" />
+                        </div>
+                        <div>
+                          <h3 className="font-semibold text-lg">Performance Report</h3>
+                          <p className="text-sm text-muted-foreground">
+                            Performance evaluations and rankings
+                          </p>
+                        </div>
                         <Button 
-                          onClick={() => generateReport('performance')} 
-                          className="w-full"
+                          className="w-full" 
                           variant="outline"
+                          onClick={() => generateReport('performance')}
                         >
                           <Download className="h-4 w-4 mr-2" />
-                          Download Report
+                          Generate Report
                         </Button>
-                      </CardContent>
-                    </Card>
-                  </div>
-                </CardContent>
-              </Card>
-
-              <Card>
-                <CardHeader>
-                  <CardTitle>Quick Statistics</CardTitle>
-                  <CardDescription>Overview of key metrics</CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                    <div className="text-center p-4 bg-muted rounded-lg">
-                      <div className="text-2xl font-bold text-primary">{stats.totalCadets}</div>
-                      <div className="text-sm text-muted-foreground">Total Cadets</div>
-                    </div>
-                    <div className="text-center p-4 bg-muted rounded-lg">
-                      <div className="text-2xl font-bold text-blue-600">{stats.juniorPlatoon}</div>
-                      <div className="text-sm text-muted-foreground">Junior Platoon</div>
-                    </div>
-                    <div className="text-center p-4 bg-muted rounded-lg">
-                      <div className="text-2xl font-bold text-green-600">{stats.seniorPlatoon}</div>
-                      <div className="text-sm text-muted-foreground">Senior Platoon</div>
-                    </div>
-                    <div className="text-center p-4 bg-muted rounded-lg">
-                      <div className="text-2xl font-bold text-orange-600">{stats.recentJoins}</div>
-                      <div className="text-sm text-muted-foreground">Recent Joins</div>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center space-x-2">
-                    <AlertTriangle className="h-5 w-5 text-yellow-600" />
-                    <span>System Status</span>
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-3">
-                    <div className="flex items-center justify-between p-3 bg-green-50 rounded-lg border border-green-200">
-                      <span className="text-green-800">Database Connection</span>
-                      <Badge className="bg-green-100 text-green-800">Active</Badge>
-                    </div>
-                    <div className="flex items-center justify-between p-3 bg-green-50 rounded-lg border border-green-200">
-                      <span className="text-green-800">Authentication Service</span>
-                      <Badge className="bg-green-100 text-green-800">Active</Badge>
-                    </div>
-                    <div className="flex items-center justify-between p-3 bg-blue-50 rounded-lg border border-blue-200">
-                      <span className="text-blue-800">Edge Functions</span>
-                      <Badge className="bg-blue-100 text-blue-800">Operational</Badge>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                </div>
+              </CardContent>
+            </Card>
           </TabsContent>
         </Tabs>
       </div>
