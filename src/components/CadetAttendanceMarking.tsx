@@ -29,7 +29,7 @@ interface MyAttendance {
   exit_time: string;
   participation_minutes: number;
   attendance_percentage: number;
-  attendance_status: 'present' | 'leave_early' | 'absent';
+  attendance_status: string;
   marked_at: string;
 }
 

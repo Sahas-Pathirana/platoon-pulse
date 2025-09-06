@@ -35,7 +35,7 @@ interface AttendanceRecord {
   exit_time: string;
   participation_minutes: number;
   attendance_percentage: number;
-  attendance_status: 'present' | 'leave_early' | 'absent';
+  attendance_status: string;
 }
 
 const AttendanceManagement = () => {
@@ -105,6 +105,7 @@ const AttendanceManagement = () => {
           practice_date: newSession.practice_date,
           start_time: newSession.start_time,
           end_time: newSession.end_time,
+          created_by: '00000000-0000-0000-0000-000000000000', // Placeholder for created_by
         });
 
       if (error) throw error;
@@ -141,7 +142,10 @@ const AttendanceManagement = () => {
         .rpc('get_attendance_report', { session_id: sessionId });
 
       if (error) throw error;
-      setAttendanceRecords(data || []);
+      setAttendanceRecords((data || []).map(record => ({
+        ...record,
+        id: record.id || `${record.cadet_name}-${sessionId}`,
+      })));
     } catch (error: any) {
       toast({
         title: "Error",

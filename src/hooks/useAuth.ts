@@ -49,9 +49,8 @@ export const useAuth = () => {
               } else {
                 setUser({
                   ...session.user,
-                  role: profile?.role || 'student',
-                  cadet_id: profile?.cadet_id
-                });
+                  role: profile?.role || 'student'
+                } as AuthUser);
               }
               setLoading(false);
             });

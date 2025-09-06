@@ -117,6 +117,60 @@ export type Database = {
           },
         ]
       }
+      cadet_attendance: {
+        Row: {
+          attendance_percentage: number | null
+          attendance_status: string | null
+          cadet_id: string
+          created_at: string
+          entry_time: string | null
+          exit_time: string | null
+          id: string
+          marked_at: string | null
+          participation_minutes: number | null
+          practice_session_id: string
+        }
+        Insert: {
+          attendance_percentage?: number | null
+          attendance_status?: string | null
+          cadet_id: string
+          created_at?: string
+          entry_time?: string | null
+          exit_time?: string | null
+          id?: string
+          marked_at?: string | null
+          participation_minutes?: number | null
+          practice_session_id: string
+        }
+        Update: {
+          attendance_percentage?: number | null
+          attendance_status?: string | null
+          cadet_id?: string
+          created_at?: string
+          entry_time?: string | null
+          exit_time?: string | null
+          id?: string
+          marked_at?: string | null
+          participation_minutes?: number | null
+          practice_session_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "cadet_attendance_cadet_id_fkey"
+            columns: ["cadet_id"]
+            isOneToOne: false
+            referencedRelation: "cadets"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cadet_attendance_practice_session_id_fkey"
+            columns: ["practice_session_id"]
+            isOneToOne: false
+            referencedRelation: "practice_sessions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       cadets: {
         Row: {
           age: number | null
@@ -530,6 +584,45 @@ export type Database = {
           },
         ]
       }
+      practice_sessions: {
+        Row: {
+          created_at: string
+          created_by: string
+          description: string | null
+          duration_minutes: number | null
+          end_time: string
+          id: string
+          practice_date: string
+          start_time: string
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          created_by: string
+          description?: string | null
+          duration_minutes?: number | null
+          end_time: string
+          id?: string
+          practice_date: string
+          start_time: string
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string
+          description?: string | null
+          duration_minutes?: number | null
+          end_time?: string
+          id?: string
+          practice_date?: string
+          start_time?: string
+          title?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       promotions: {
         Row: {
           cadet_id: string
@@ -749,6 +842,20 @@ export type Database = {
       current_cadet_id: {
         Args: { user_id?: string }
         Returns: string
+      }
+      get_attendance_report: {
+        Args: { session_id: string }
+        Returns: {
+          application_number: string
+          attendance_percentage: number
+          attendance_status: string
+          cadet_name: string
+          entry_time: string
+          exit_time: string
+          id: string
+          participation_minutes: number
+          platoon: string
+        }[]
       }
       get_user_role: {
         Args: { user_id?: string }
