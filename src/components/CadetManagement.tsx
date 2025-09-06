@@ -696,55 +696,57 @@ const CadetManagement = () => {
 
       {/* Selected Cadet Records Management */}
       {selectedCadet && (
-        <Card>
+        <Card className="mt-6">
           <CardHeader>
-            <CardTitle className="flex items-center justify-between">
+            <CardTitle className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
               <span>Managing: {selectedCadet.name_full}</span>
-              <Badge>{selectedCadet.application_number}</Badge>
+              <Badge variant="secondary" className="text-sm">
+                App No: {selectedCadet.application_number}
+              </Badge>
             </CardTitle>
             <CardDescription>
               Add and manage additional records for this cadet
             </CardDescription>
           </CardHeader>
-          <CardContent>
+          <CardContent className="space-y-6">
             <Tabs value={activeTab} onValueChange={setActiveTab}>
-              <TabsList className="grid grid-cols-4 lg:grid-cols-8">
+              <TabsList className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-8 gap-1">
                 <TabsTrigger value="achievements" className="flex items-center gap-1">
                   <Award className="h-4 w-4" />
-                  <span className="hidden sm:inline">Achievements</span>
+                  <span className="hidden md:inline">Achievements</span>
                 </TabsTrigger>
                 <TabsTrigger value="disciplinary" className="flex items-center gap-1">
                   <AlertTriangle className="h-4 w-4" />
-                  <span className="hidden sm:inline">Disciplinary</span>
+                  <span className="hidden md:inline">Disciplinary</span>
                 </TabsTrigger>
                 <TabsTrigger value="education" className="flex items-center gap-1">
                   <GraduationCap className="h-4 w-4" />
-                  <span className="hidden sm:inline">Education</span>
+                  <span className="hidden md:inline">Education</span>
                 </TabsTrigger>
                 <TabsTrigger value="training" className="flex items-center gap-1">
                   <Target className="h-4 w-4" />
-                  <span className="hidden sm:inline">Training</span>
+                  <span className="hidden md:inline">Training</span>
                 </TabsTrigger>
                 <TabsTrigger value="performance" className="flex items-center gap-1">
                   <Activity className="h-4 w-4" />
-                  <span className="hidden sm:inline">Performance</span>
+                  <span className="hidden md:inline">Performance</span>
                 </TabsTrigger>
                 <TabsTrigger value="attendance" className="flex items-center gap-1">
                   <UserCheck className="h-4 w-4" />
-                  <span className="hidden sm:inline">Attendance</span>
+                  <span className="hidden md:inline">Attendance</span>
                 </TabsTrigger>
                 <TabsTrigger value="events" className="flex items-center gap-1">
                   <Calendar className="h-4 w-4" />
-                  <span className="hidden sm:inline">Events</span>
+                  <span className="hidden md:inline">Events</span>
                 </TabsTrigger>
                 <TabsTrigger value="medical" className="flex items-center gap-1">
                   <Heart className="h-4 w-4" />
-                  <span className="hidden sm:inline">Medical</span>
+                  <span className="hidden md:inline">Medical</span>
                 </TabsTrigger>
               </TabsList>
 
               {['achievements', 'disciplinary', 'education', 'training'].map((tabKey) => (
-                <TabsContent key={tabKey} value={tabKey} className="space-y-4">
+                <TabsContent key={tabKey} value={tabKey} className="space-y-6 mt-6">
                   <div className="flex justify-between items-center">
                     <h3 className="text-lg font-semibold">
                       {tabKey === 'achievements' && 'Achievements & Awards'}
@@ -795,7 +797,7 @@ const CadetManagement = () => {
                     </Dialog>
                   </div>
 
-                  <div className="border rounded-lg">
+                  <div className="border rounded-lg overflow-hidden">
                     {renderRecordTable()}
                   </div>
                 </TabsContent>
@@ -803,9 +805,9 @@ const CadetManagement = () => {
 
               {/* Placeholder tabs for future implementation */}
               {['performance', 'attendance', 'events', 'medical'].map((tabKey) => (
-                <TabsContent key={tabKey} value={tabKey} className="space-y-4">
+                <TabsContent key={tabKey} value={tabKey} className="space-y-6 mt-6">
                   <Card>
-                    <CardContent className="p-6 text-center">
+                    <CardContent className="p-8 text-center">
                       <h3 className="text-lg font-semibold mb-2">
                         {tabKey === 'performance' && 'Performance Evaluations'}
                         {tabKey === 'attendance' && 'Attendance Records'}
@@ -813,7 +815,7 @@ const CadetManagement = () => {
                         {tabKey === 'medical' && 'Medical Records'}
                       </h3>
                       <p className="text-muted-foreground">
-                        This section will be implemented to manage {tabKey} records.
+                        This section will be implemented soon to manage {tabKey} records for the selected cadet.
                       </p>
                     </CardContent>
                   </Card>

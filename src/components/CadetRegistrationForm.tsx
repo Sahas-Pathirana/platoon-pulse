@@ -166,7 +166,36 @@ export const CadetRegistrationForm = ({ onSuccess }: CadetRegistrationFormProps)
 
   const handleDateOfBirthChange = (dateOfBirth: string) => {
     updateFormData('dateOfBirth', dateOfBirth);
-    updateFormData('age', calculateAge(dateOfBirth));
+    const calculatedAge = calculateAge(dateOfBirth);
+    updateFormData('age', calculatedAge);
+    
+    // Automatically select platoon based on age
+    const ageNum = parseInt(calculatedAge);
+    if (ageNum >= 14) {
+      updateFormData('platoon', 'Senior');
+    } else if (ageNum >= 12) {
+      updateFormData('platoon', 'Junior');
+    }
+  };
+
+  const validateRegimentNumber = (regimentNo: string): boolean => {
+    // Format: XX/XX/X/XXX (2 digits, 2 digits, 1 digit, 3 digits)
+    const regimentPattern = /^\d{2}\/\d{2}\/\d{1}\/\d{3}$/;
+    return regimentPattern.test(regimentNo);
+  };
+
+  const formatRegimentNumber = (value: string): string => {
+    // Remove all non-digits
+    const digits = value.replace(/\D/g, '');
+    
+    // Apply formatting: XX/XX/X/XXX
+    let formatted = '';
+    if (digits.length > 0) formatted += digits.substring(0, 2);
+    if (digits.length > 2) formatted += '/' + digits.substring(2, 4);
+    if (digits.length > 4) formatted += '/' + digits.substring(4, 5);
+    if (digits.length > 5) formatted += '/' + digits.substring(5, 8);
+    
+    return formatted;
   };
 
   const validateForm = (): string[] => {
@@ -178,6 +207,11 @@ export const CadetRegistrationForm = ({ onSuccess }: CadetRegistrationFormProps)
     if (!formData.dateOfBirth) errors.push("Date of Birth is required");
     if (!formData.email) errors.push("Email is required");
     if (!formData.password) errors.push("Password is required");
+    
+    // Regiment number validation
+    if (formData.regimentNo && !validateRegimentNumber(formData.regimentNo)) {
+      errors.push("Regiment Number must be in format XX/XX/X/XXX (e.g., 12/34/5/678)");
+    }
     
     // Age validation for platoon
     const age = parseInt(formData.age);
@@ -305,6 +339,57 @@ export const CadetRegistrationForm = ({ onSuccess }: CadetRegistrationFormProps)
         description: `Cadet account created successfully for ${formData.fullName}`,
       });
 
+      // Reset form
+      setFormData({
+        email: '',
+        password: '',
+        fullName: '',
+        nameWithInitials: '',
+        applicationNumber: '',
+        dateOfBirth: '',
+        age: '',
+        schoolAdmissionNo: '',
+        regimentNo: '',
+        rank: 'Cadet',
+        platoon: 'Junior',
+        dateOfEnrollment: '',
+        birthCertificateNo: '',
+        nationalId: '',
+        bloodGroup: '',
+        heightCm: '',
+        chestCm: '',
+        photographUrl: '',
+        skillsTalents: '',
+        permanentAddress: '',
+        postalAddress: '',
+        dateJoinedPractices: '',
+        dateLeftPractices: '',
+        withdrawalLetterType: '',
+        withdrawalDateFrom: '',
+        withdrawalDateTo: '',
+        withdrawalReason: '',
+        withdrawalApproved: false,
+        battalionInformed: false,
+        battalionAcceptance: false,
+        battalionAcceptanceDate: '',
+        fatherName: '',
+        fatherOccupation: '',
+        fatherContact: '',
+        fatherWhatsapp: '',
+        motherName: '',
+        motherOccupation: '',
+        motherContact: '',
+        motherWhatsapp: '',
+        guardianName: '',
+        guardianContact: '',
+        medicalCertificateUrl: '',
+        medicalIssuanceParty: '',
+        medicalDateOfIssue: '',
+        medicalValidityEndDate: '',
+        masterRemarks: '',
+        rectorRecommendations: '',
+      });
+      setActiveTab('basic');
       onSuccess();
     } catch (error: any) {
       if (error.code === '23505' && error.message?.includes('application_number')) {
@@ -440,15 +525,24 @@ export const CadetRegistrationForm = ({ onSuccess }: CadetRegistrationFormProps)
                 
                 <div className="space-y-2">
                   <Label htmlFor="platoon">Platoon *</Label>
-                  <Select value={formData.platoon} onValueChange={(value) => updateFormData('platoon', value)}>
+                  <Select 
+                    value={formData.platoon} 
+                    onValueChange={(value) => updateFormData('platoon', value)}
+                    disabled={!!formData.age}
+                  >
                     <SelectTrigger>
-                      <SelectValue placeholder="Select platoon" />
+                      <SelectValue placeholder={formData.age ? "Auto-selected based on age" : "Select platoon"} />
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="Junior">Junior Platoon (Ages 12-14)</SelectItem>
                       <SelectItem value="Senior">Senior Platoon (Ages 14-20)</SelectItem>
                     </SelectContent>
                   </Select>
+                  {formData.age && (
+                    <p className="text-xs text-muted-foreground">
+                      Platoon automatically selected based on age ({formData.age} years)
+                    </p>
+                  )}
                 </div>
               </div>
             </TabsContent>
@@ -471,9 +565,16 @@ export const CadetRegistrationForm = ({ onSuccess }: CadetRegistrationFormProps)
                   <Input
                     id="regimentNo"
                     value={formData.regimentNo}
-                    onChange={(e) => updateFormData('regimentNo', e.target.value)}
-                    placeholder="XX/XX/X/XXX"
+                    onChange={(e) => {
+                      const formatted = formatRegimentNumber(e.target.value);
+                      updateFormData('regimentNo', formatted);
+                    }}
+                    placeholder="12/34/5/678"
+                    maxLength={11}
                   />
+                  <p className="text-xs text-muted-foreground">
+                    Format: XX/XX/X/XXX (automatically formatted)
+                  </p>
                 </div>
                 
                 <div className="space-y-2">
