@@ -5,6 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -40,6 +41,7 @@ interface AttendanceRecord {
 
 const AttendanceManagement = () => {
   const { toast } = useToast();
+  const { user } = useAuth();
   const [isLoading, setIsLoading] = useState(false);
   const [sessions, setSessions] = useState<PracticeSession[]>([]);
   const [selectedSession, setSelectedSession] = useState<PracticeSession | null>(null);
@@ -97,6 +99,10 @@ const AttendanceManagement = () => {
 
     setIsLoading(true);
     try {
+      const [sh, sm] = newSession.start_time.split(':').map(Number);
+      const [eh, em] = newSession.end_time.split(':').map(Number);
+      const durationMinutes = (eh * 60 + em) - (sh * 60 + sm);
+
       const { error } = await supabase
         .from('practice_sessions')
         .insert({
@@ -105,7 +111,8 @@ const AttendanceManagement = () => {
           practice_date: newSession.practice_date,
           start_time: newSession.start_time,
           end_time: newSession.end_time,
-          created_by: '00000000-0000-0000-0000-000000000000', // Placeholder for created_by
+          duration_minutes: durationMinutes,
+          created_by: (user?.id as string),
         });
 
       if (error) throw error;
