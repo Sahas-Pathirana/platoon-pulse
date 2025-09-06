@@ -5,6 +5,7 @@ import { toast } from '@/hooks/use-toast';
 
 export interface AuthUser extends User {
   role?: 'admin' | 'student';
+  cadet_id?: string;
 }
 
 export const useAuth = () => {
@@ -48,7 +49,8 @@ export const useAuth = () => {
               } else {
                 setUser({
                   ...session.user,
-                  role: profile?.role || 'student'
+                  role: profile?.role || 'student',
+                  cadet_id: profile?.cadet_id
                 });
               }
               setLoading(false);

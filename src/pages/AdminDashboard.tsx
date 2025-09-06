@@ -14,6 +14,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Di
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
+import AttendanceManagement from "@/components/AttendanceManagement";
 
 interface Cadet {
   id: string;
@@ -262,6 +263,7 @@ const AdminDashboard = () => {
         <Tabs defaultValue="create-account" className="w-full">
           <TabsList>
             <TabsTrigger value="create-account">Create Cadet Account</TabsTrigger>
+            <TabsTrigger value="attendance">Attendance Management</TabsTrigger>
             <TabsTrigger value="manage-cadets">Basic Cadet Management</TabsTrigger>
             <TabsTrigger value="cadet-records">Cadet Records Management</TabsTrigger>
             <TabsTrigger value="reports">Reports</TabsTrigger>
@@ -269,6 +271,10 @@ const AdminDashboard = () => {
           
           <TabsContent value="create-account">
             <CadetRegistrationForm onSuccess={fetchCadets} />
+          </TabsContent>
+          
+          <TabsContent value="attendance">
+            <AttendanceManagement />
           </TabsContent>
           
           <TabsContent value="manage-cadets">

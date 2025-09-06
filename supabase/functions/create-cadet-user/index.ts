@@ -48,14 +48,20 @@ Deno.serve(async (req) => {
     // Create Supabase admin client using service role key
     const supabaseAdmin = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
+      {
+        auth: {
+          autoRefreshToken: false,
+          persistSession: false
+        }
+      }
     )
 
-    // Create the user account
+    // Create the user account with email confirmation disabled
     const { data: authData, error: authError } = await supabaseAdmin.auth.admin.createUser({
       email,
       password,
-      email_confirm: true,
+      email_confirm: true, // Skip email confirmation
       user_metadata: {
         full_name: fullName,
       },
@@ -65,6 +71,16 @@ Deno.serve(async (req) => {
       console.error('Auth error:', authError)
       return new Response(
         JSON.stringify({ error: authError.message }),
+        { 
+          status: 400, 
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+        }
+      )
+    }
+
+    if (!authData.user) {
+      return new Response(
+        JSON.stringify({ error: 'Failed to create user' }),
         { 
           status: 400, 
           headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
@@ -85,8 +101,12 @@ Deno.serve(async (req) => {
 
     if (profileError) {
       console.error('Profile error:', profileError)
+      
+      // If profile creation fails, clean up the auth user
+      await supabaseAdmin.auth.admin.deleteUser(authData.user.id)
+      
       return new Response(
-        JSON.stringify({ error: profileError.message }),
+        JSON.stringify({ error: `Profile creation failed: ${profileError.message}` }),
         { 
           status: 400, 
           headers: { ...corsHeaders, 'Content-Type': 'application/json' } 

@@ -228,6 +228,60 @@ export type Database = {
         }
         Relationships: []
       }
+      cadet_attendance: {
+        Row: {
+          attendance_percentage: number | null
+          attendance_status: Database["public"]["Enums"]["attendance_status"] | null
+          cadet_id: string
+          created_at: string
+          entry_time: string | null
+          exit_time: string | null
+          id: string
+          marked_at: string | null
+          participation_minutes: number | null
+          practice_session_id: string
+        }
+        Insert: {
+          attendance_percentage?: number | null
+          attendance_status?: Database["public"]["Enums"]["attendance_status"] | null
+          cadet_id: string
+          created_at?: string
+          entry_time?: string | null
+          exit_time?: string | null
+          id?: string
+          marked_at?: string | null
+          participation_minutes?: number | null
+          practice_session_id: string
+        }
+        Update: {
+          attendance_percentage?: number | null
+          attendance_status?: Database["public"]["Enums"]["attendance_status"] | null
+          cadet_id?: string
+          created_at?: string
+          entry_time?: string | null
+          exit_time?: string | null
+          id?: string
+          marked_at?: string | null
+          participation_minutes?: number | null
+          practice_session_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "cadet_attendance_cadet_id_fkey"
+            columns: ["cadet_id"]
+            isOneToOne: false
+            referencedRelation: "cadets"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cadet_attendance_practice_session_id_fkey"
+            columns: ["practice_session_id"]
+            isOneToOne: false
+            referencedRelation: "practice_sessions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       disciplinary_actions: {
         Row: {
           cadet_id: string
@@ -530,6 +584,53 @@ export type Database = {
           },
         ]
       }
+      practice_sessions: {
+        Row: {
+          created_at: string | null
+          created_by: string
+          description: string | null
+          duration_minutes: number | null
+          end_time: string
+          id: string
+          practice_date: string
+          start_time: string
+          title: string
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          created_by: string
+          description?: string | null
+          duration_minutes?: number | null
+          end_time: string
+          id?: string
+          practice_date: string
+          start_time: string
+          title: string
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          created_by?: string
+          description?: string | null
+          duration_minutes?: number | null
+          end_time?: string
+          id?: string
+          practice_date?: string
+          start_time?: string
+          title?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "practice_sessions_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       promotions: {
         Row: {
           cadet_id: string
@@ -754,12 +855,28 @@ export type Database = {
         Args: { user_id?: string }
         Returns: Database["public"]["Enums"]["user_role"]
       }
+      get_attendance_report: {
+        Args: {
+          session_id: string
+        }
+        Returns: {
+          cadet_name: string
+          application_number: string
+          platoon: string
+          entry_time: string
+          exit_time: string
+          participation_minutes: number
+          attendance_percentage: number
+          attendance_status: Database["public"]["Enums"]["attendance_status"]
+        }[]
+      }
       is_admin: {
         Args: { user_id?: string }
         Returns: boolean
       }
     }
     Enums: {
+      attendance_status: "present" | "leave_early" | "absent"
       user_role: "admin" | "student"
     }
     CompositeTypes: {
@@ -888,6 +1005,7 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
+      attendance_status: ["present", "leave_early", "absent"],
       user_role: ["admin", "student"],
     },
   },
