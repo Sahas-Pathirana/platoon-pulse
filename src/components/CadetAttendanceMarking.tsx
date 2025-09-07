@@ -124,18 +124,16 @@ const CadetAttendanceMarking = () => {
         // Create new record
         let cadetId = user?.cadet_id;
         if (!cadetId) {
-          const { data: rpcCadetId, error: rpcError } = await supabase.rpc('current_cadet_id');
-          if (rpcError || !rpcCadetId) {
-            throw new Error('Unable to determine your cadet profile. Please contact an admin.');
-          }
-          cadetId = rpcCadetId as string;
+          const { data: rpcCadetId } = await supabase.rpc('current_cadet_id');
+          cadetId = (rpcCadetId as string | null | undefined) || undefined;
         }
 
-        const insertData = {
+        const baseData = {
           practice_session_id: sessionId,
-          cadet_id: cadetId,
           ...(type === 'entry' ? { entry_time: currentTime } : { exit_time: currentTime })
-        };
+        } as any;
+
+        const insertData = cadetId ? { ...baseData, cadet_id: cadetId } : baseData;
 
         const { error } = await supabase
           .from('cadet_attendance')
@@ -200,21 +198,20 @@ const CadetAttendanceMarking = () => {
         // Create new record
         let cadetId = user?.cadet_id;
         if (!cadetId) {
-          const { data: rpcCadetId, error: rpcError } = await supabase.rpc('current_cadet_id');
-          if (rpcError || !rpcCadetId) {
-            throw new Error('Unable to determine your cadet profile. Please contact an admin.');
-          }
-          cadetId = rpcCadetId as string;
+          const { data: rpcCadetId } = await supabase.rpc('current_cadet_id');
+          cadetId = (rpcCadetId as string | null | undefined) || undefined;
         }
+
+        const insertPayload = {
+          practice_session_id: sessionId,
+          entry_time: form.entry_time,
+          exit_time: form.exit_time,
+          ...(cadetId ? { cadet_id: cadetId } : {})
+        } as any;
 
         const { error } = await supabase
           .from('cadet_attendance')
-          .insert({
-            practice_session_id: sessionId,
-            cadet_id: cadetId,
-            entry_time: form.entry_time,
-            exit_time: form.exit_time
-          });
+          .insert(insertPayload);
 
         if (error) throw error;
       }
