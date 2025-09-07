@@ -78,8 +78,8 @@ const CadetAttendanceMarking = () => {
           attendance_percentage,
           attendance_status,
           marked_at
-        `)
-        .eq('cadet_id', user?.cadet_id);
+        `);
+
 
       if (error) throw error;
 
@@ -122,10 +122,19 @@ const CadetAttendanceMarking = () => {
         if (error) throw error;
       } else {
         // Create new record
+        let cadetId = user?.cadet_id;
+        if (!cadetId) {
+          const { data: rpcCadetId, error: rpcError } = await supabase.rpc('current_cadet_id');
+          if (rpcError || !rpcCadetId) {
+            throw new Error('Unable to determine your cadet profile. Please contact an admin.');
+          }
+          cadetId = rpcCadetId as string;
+        }
+
         const insertData = {
           practice_session_id: sessionId,
-          cadet_id: user?.cadet_id,
-          [type === 'entry' ? 'entry_time' : 'exit_time']: currentTime
+          cadet_id: cadetId,
+          ...(type === 'entry' ? { entry_time: currentTime } : { exit_time: currentTime })
         };
 
         const { error } = await supabase
@@ -189,11 +198,20 @@ const CadetAttendanceMarking = () => {
         if (error) throw error;
       } else {
         // Create new record
+        let cadetId = user?.cadet_id;
+        if (!cadetId) {
+          const { data: rpcCadetId, error: rpcError } = await supabase.rpc('current_cadet_id');
+          if (rpcError || !rpcCadetId) {
+            throw new Error('Unable to determine your cadet profile. Please contact an admin.');
+          }
+          cadetId = rpcCadetId as string;
+        }
+
         const { error } = await supabase
           .from('cadet_attendance')
           .insert({
             practice_session_id: sessionId,
-            cadet_id: user?.cadet_id,
+            cadet_id: cadetId,
             entry_time: form.entry_time,
             exit_time: form.exit_time
           });
