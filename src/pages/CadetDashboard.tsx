@@ -8,7 +8,6 @@ import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import CadetAttendanceMarking from "@/components/CadetAttendanceMarking";
-import CadetLinkingForm from "@/components/CadetLinkingForm";
 import { Badge, Calendar, User, Award, Settings, Lock, AlertTriangle } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useState } from "react";
@@ -221,12 +220,6 @@ const CadetDashboard = () => {
             <TabsTrigger value="overview">Overview</TabsTrigger>
             <TabsTrigger value="attendance" disabled={!hasLinkedCadet}>Attendance</TabsTrigger>
           </TabsList>
-          
-          {!hasLinkedCadet && (
-            <TabsContent value="linking">
-              <CadetLinkingForm />
-            </TabsContent>
-          )}
           
           <TabsContent value="overview">
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">

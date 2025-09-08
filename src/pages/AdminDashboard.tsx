@@ -2,7 +2,6 @@ import { useState, useEffect } from "react";
 import { Navigation } from "@/components/Navigation";
 import { CadetRegistrationForm } from "@/components/CadetRegistrationForm";
 import CadetManagement from "@/components/CadetManagement";
-import AdminLinkingRequests from "@/components/AdminLinkingRequests";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -273,10 +272,6 @@ const AdminDashboard = () => {
           
           <TabsContent value="create-account">
             <CadetRegistrationForm onSuccess={fetchCadets} />
-          </TabsContent>
-          
-          <TabsContent value="linking-requests">
-            <AdminLinkingRequests />
           </TabsContent>
           
           <TabsContent value="attendance">

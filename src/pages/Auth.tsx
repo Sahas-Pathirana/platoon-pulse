@@ -18,7 +18,8 @@ const Auth = () => {
   const [signupForm, setSignupForm] = useState({
     email: '',
     password: '',
-    fullName: ''
+    fullName: '',
+    regimentNumber: ''
   });
 
   // Redirect authenticated users - use Navigate component instead of useEffect
@@ -52,7 +53,7 @@ const Auth = () => {
     e.preventDefault();
     setIsLoading(true);
     
-    await signUp(signupForm.email, signupForm.password, signupForm.fullName);
+    await signUp(signupForm.email, signupForm.password, signupForm.fullName, signupForm.regimentNumber);
     
     setIsLoading(false);
   };
@@ -160,6 +161,17 @@ const Auth = () => {
                       type="password"
                       value={signupForm.password}
                       onChange={(e) => setSignupForm({ ...signupForm, password: e.target.value })}
+                      required
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="signup-regiment">Regiment Number</Label>
+                    <Input
+                      id="signup-regiment"
+                      type="text"
+                      placeholder="Enter your regiment number"
+                      value={signupForm.regimentNumber}
+                      onChange={(e) => setSignupForm({ ...signupForm, regimentNumber: e.target.value })}
                       required
                     />
                   </div>

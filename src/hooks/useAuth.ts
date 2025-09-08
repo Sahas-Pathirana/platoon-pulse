@@ -104,7 +104,7 @@ export const useAuth = () => {
     return { error };
   };
 
-  const signUp = async (email: string, password: string, fullName: string) => {
+  const signUp = async (email: string, password: string, fullName: string, regimentNumber?: string) => {
     const redirectUrl = `${window.location.origin}/`;
     
     const { error } = await supabase.auth.signUp({
@@ -114,6 +114,7 @@ export const useAuth = () => {
         emailRedirectTo: redirectUrl,
         data: {
           full_name: fullName,
+          regiment_number: regimentNumber,
         },
       },
     });
