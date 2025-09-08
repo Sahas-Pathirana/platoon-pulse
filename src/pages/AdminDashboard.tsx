@@ -1,8 +1,10 @@
+import CadetManagement from "@/components/CadetManagement";
 import { useState, useEffect } from "react";
 import { Navigation } from "@/components/Navigation";
 import { CadetRegistrationForm } from "@/components/CadetRegistrationForm";
 import CadetManagement from "@/components/CadetManagement";
 import AdminLinkingRequests from "@/components/AdminLinkingRequests";
+
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -206,16 +208,16 @@ const AdminDashboard = () => {
   return (
     <div className="min-h-screen bg-background">
       <Navigation />
-      
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <div className="mb-8">
-          <h2 className="text-3xl font-bold text-foreground">Admin Dashboard</h2>
-          <p className="text-muted-foreground mt-2">
+
+      <div className="max-w-7xl mx-auto px-2 sm:px-6 lg:px-8 py-8">
+  <div className="mb-10 pt-6 pb-6 sm:pt-10 sm:pb-10 flex flex-col items-center sm:items-start max-w-full sm:max-w-fit mx-auto w-full sm:w-auto">
+          <h2 className="text-2xl sm:text-3xl font-bold text-foreground text-center sm:text-left">Admin Dashboard</h2>
+          <p className="text-muted-foreground mt-3 text-center sm:text-left">
             Manage cadet accounts and information
           </p>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-8 mb-10">
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium">Total Cadets</CardTitle>
@@ -261,44 +263,54 @@ const AdminDashboard = () => {
           </Card>
         </div>
 
-        <Tabs defaultValue="create-account" className="w-full">
-          <TabsList>
-            <TabsTrigger value="create-account">Create Cadet Account</TabsTrigger>
-            <TabsTrigger value="linking-requests">Account Linking</TabsTrigger>
-            <TabsTrigger value="attendance">Attendance Management</TabsTrigger>
-            <TabsTrigger value="manage-cadets">Basic Cadet Management</TabsTrigger>
-            <TabsTrigger value="cadet-records">Cadet Records Management</TabsTrigger>
-            <TabsTrigger value="reports">Reports</TabsTrigger>
-          </TabsList>
+
+  <div className="h-12 sm:h-16 lg:h-20" />
+  <Tabs defaultValue="create-account" className="w-full mt-6">
+          <div className="w-full mb-20 flex flex-col items-center">
+            <div className="relative w-full">
+              <div className="absolute left-0 top-0 w-full h-full bg-muted rounded-lg" />
+              <TabsList
+                className="flex flex-col w-full items-center justify-center min-h-[260px] sm:min-h-[60px] sm:flex-row sm:flex-wrap sm:gap-x-8 sm:gap-y-2 relative"
+                style={{ width: '100%' }}
+              >
+                <TabsTrigger value="create-account" className="block w-full sm:w-auto px-4 py-3 text-center">Create Cadet Account</TabsTrigger>
+                <TabsTrigger value="attendance" className="block w-full sm:w-auto px-4 py-3 text-center">Attendance Management</TabsTrigger>
+                <TabsTrigger value="manage-cadets" className="block w-full sm:w-auto px-4 py-3 text-center">Basic Cadet Management</TabsTrigger>
+                <TabsTrigger value="cadet-records" className="block w-full sm:w-auto px-4 py-3 text-center">Cadet Records Management</TabsTrigger>
+                <TabsTrigger value="reports" className="block w-full sm:w-auto px-4 py-3 text-center">Reports</TabsTrigger>
+              </TabsList>
+            </div>
+          </div>
           
-          <TabsContent value="create-account">
-            <CadetRegistrationForm onSuccess={fetchCadets} />
-          </TabsContent>
-          
-          <TabsContent value="linking-requests">
-            <AdminLinkingRequests />
-          </TabsContent>
-          
+            <TabsContent value="create-account">
+              <div className="mb-8 mt-28 sm:mt-12">
+                <CadetRegistrationForm onSuccess={fetchCadets} />
+              </div>
+            </TabsContent>
+
+
           <TabsContent value="attendance">
-            <AttendanceManagement />
+            <div className="mb-8 mt-16 sm:mt-0">
+              <AttendanceManagement />
+            </div>
           </TabsContent>
-          
+
           <TabsContent value="manage-cadets">
-            <Card>
-              <CardHeader>
+            <Card className="mb-8 mt-16 sm:mt-0">
+              <CardHeader className="pb-4">
                 <CardTitle>Basic Cadet Management</CardTitle>
                 <CardDescription>View and manage basic cadet information</CardDescription>
               </CardHeader>
               <CardContent>
-                <div className="space-y-4">
-                  <div className="flex justify-between items-center">
+                <div className="space-y-6">
+                  <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-4">
                     <h3 className="text-lg font-semibold">Cadet List ({cadets.length})</h3>
                     <Button onClick={fetchCadets} variant="outline">
                       Refresh
                     </Button>
                   </div>
-                  
-                  <div className="border rounded-lg">
+
+                  <div className="border rounded-lg overflow-x-auto">
                     <Table>
                       <TableHeader>
                         <TableRow>
@@ -313,14 +325,14 @@ const AdminDashboard = () => {
                       <TableBody>
                         {cadets.map((cadet) => (
                           <TableRow key={cadet.id}>
-                            <TableCell className="font-medium">{cadet.name_full}</TableCell>
-                            <TableCell>{cadet.application_number}</TableCell>
+                            <TableCell className="font-medium whitespace-nowrap">{cadet.name_full}</TableCell>
+                            <TableCell className="whitespace-nowrap">{cadet.application_number}</TableCell>
                             <TableCell>
                               <Badge variant={cadet.platoon === 'Junior' ? 'secondary' : 'default'}>
                                 {cadet.platoon}
                               </Badge>
                             </TableCell>
-                            <TableCell>{cadet.rank || 'Cadet'}</TableCell>
+                            <TableCell className="whitespace-nowrap">{cadet.rank || 'Cadet'}</TableCell>
                             <TableCell>{cadet.age || 'N/A'}</TableCell>
                             <TableCell>
                               <div className="flex space-x-2">
@@ -344,7 +356,7 @@ const AdminDashboard = () => {
                                         Update cadet details below
                                       </DialogDescription>
                                     </DialogHeader>
-                                    <div className="grid grid-cols-2 gap-4 py-4">
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 py-4">
                                       <div className="space-y-2">
                                         <Label htmlFor="edit-name">Full Name</Label>
                                         <Input
@@ -391,7 +403,7 @@ const AdminDashboard = () => {
                                         </select>
                                       </div>
                                     </div>
-                                    <div className="flex justify-end space-x-2">
+                                    <div className="flex justify-end space-x-2 mt-4">
                                       <Button variant="outline" onClick={() => setIsEditDialogOpen(false)}>
                                         Cancel
                                       </Button>
@@ -401,7 +413,7 @@ const AdminDashboard = () => {
                                     </div>
                                   </DialogContent>
                                 </Dialog>
-                                
+
                                 <Button
                                   variant="outline"
                                   size="sm"
@@ -423,11 +435,13 @@ const AdminDashboard = () => {
           </TabsContent>
 
           <TabsContent value="cadet-records">
-            <CadetManagement />
+            <div className="mt-16 sm:mt-0">
+              <CadetManagement />
+            </div>
           </TabsContent>
 
           <TabsContent value="reports">
-            <Card>
+            <Card className="mt-16 sm:mt-0">
               <CardHeader>
                 <CardTitle>Reports</CardTitle>
                 <CardDescription>Generate various reports and analytics</CardDescription>
@@ -509,7 +523,10 @@ const AdminDashboard = () => {
               </CardContent>
             </Card>
           </TabsContent>
-        </Tabs>
+  </Tabs>
+  {/* Show Create Cadet Account section only when tab is active */}
+  {/* Use a state to track active tab */}
+  {/* ...existing code... */}
       </div>
     </div>
   );

@@ -85,7 +85,26 @@ const CadetAttendanceMarking = () => {
 
       const attendanceMap: Record<string, MyAttendance> = {};
       data?.forEach(record => {
-        attendanceMap[record.practice_session_id] = record;
+        let participation_minutes = 0;
+        if (record.entry_time && record.exit_time) {
+          const [eh, em] = record.exit_time.split(":").map(Number);
+          const [sh, sm] = record.entry_time.split(":").map(Number);
+          participation_minutes = (eh * 60 + em) - (sh * 60 + sm);
+          if (participation_minutes < 0) participation_minutes = 0;
+        }
+        let attendance_percentage = 0;
+        // Find the session duration
+        const session = sessions.find(s => s.id === record.practice_session_id);
+        if (session && session.duration_minutes > 0) {
+          attendance_percentage = (participation_minutes / session.duration_minutes) * 100;
+          if (attendance_percentage < 0) attendance_percentage = 0;
+          if (attendance_percentage > 100) attendance_percentage = 100;
+        }
+        attendanceMap[record.practice_session_id] = {
+          ...record,
+          participation_minutes,
+          attendance_percentage,
+        };
       });
       setMyAttendance(attendanceMap);
     } catch (error: any) {
