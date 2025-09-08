@@ -171,6 +171,51 @@ export type Database = {
           },
         ]
       }
+      cadet_linking_requests: {
+        Row: {
+          additional_info: string | null
+          admin_notes: string | null
+          application_number: string
+          approved_at: string | null
+          approved_by: string | null
+          created_at: string
+          date_of_birth: string | null
+          full_name: string
+          id: string
+          status: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          additional_info?: string | null
+          admin_notes?: string | null
+          application_number: string
+          approved_at?: string | null
+          approved_by?: string | null
+          created_at?: string
+          date_of_birth?: string | null
+          full_name: string
+          id?: string
+          status?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          additional_info?: string | null
+          admin_notes?: string | null
+          application_number?: string
+          approved_at?: string | null
+          approved_by?: string | null
+          created_at?: string
+          date_of_birth?: string | null
+          full_name?: string
+          id?: string
+          status?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       cadets: {
         Row: {
           age: number | null
@@ -389,6 +434,47 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "events_participation_cadet_id_fkey"
+            columns: ["cadet_id"]
+            isOneToOne: false
+            referencedRelation: "cadets"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      excuse_letters: {
+        Row: {
+          absent_dates: string
+          approval_status: boolean | null
+          cadet_id: string | null
+          created_at: string | null
+          eligibility: boolean | null
+          id: string
+          number_of_days: number
+          reason: string | null
+        }
+        Insert: {
+          absent_dates: string
+          approval_status?: boolean | null
+          cadet_id?: string | null
+          created_at?: string | null
+          eligibility?: boolean | null
+          id?: string
+          number_of_days: number
+          reason?: string | null
+        }
+        Update: {
+          absent_dates?: string
+          approval_status?: boolean | null
+          cadet_id?: string | null
+          created_at?: string | null
+          eligibility?: boolean | null
+          id?: string
+          number_of_days?: number
+          reason?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "excuse_letters_cadet_id_fkey"
             columns: ["cadet_id"]
             isOneToOne: false
             referencedRelation: "cadets"
@@ -830,6 +916,10 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      approve_cadet_linking: {
+        Args: { admin_notes_param?: string; request_id: string }
+        Returns: Json
+      }
       create_student_account: {
         Args: {
           student_cadet_id: string
@@ -864,6 +954,10 @@ export type Database = {
       is_admin: {
         Args: { user_id?: string }
         Returns: boolean
+      }
+      reject_cadet_linking: {
+        Args: { admin_notes_param?: string; request_id: string }
+        Returns: Json
       }
     }
     Enums: {

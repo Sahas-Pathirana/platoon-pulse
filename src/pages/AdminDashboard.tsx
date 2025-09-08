@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { Navigation } from "@/components/Navigation";
 import { CadetRegistrationForm } from "@/components/CadetRegistrationForm";
 import CadetManagement from "@/components/CadetManagement";
+import AdminLinkingRequests from "@/components/AdminLinkingRequests";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -263,6 +264,7 @@ const AdminDashboard = () => {
         <Tabs defaultValue="create-account" className="w-full">
           <TabsList>
             <TabsTrigger value="create-account">Create Cadet Account</TabsTrigger>
+            <TabsTrigger value="linking-requests">Account Linking</TabsTrigger>
             <TabsTrigger value="attendance">Attendance Management</TabsTrigger>
             <TabsTrigger value="manage-cadets">Basic Cadet Management</TabsTrigger>
             <TabsTrigger value="cadet-records">Cadet Records Management</TabsTrigger>
@@ -271,6 +273,10 @@ const AdminDashboard = () => {
           
           <TabsContent value="create-account">
             <CadetRegistrationForm onSuccess={fetchCadets} />
+          </TabsContent>
+          
+          <TabsContent value="linking-requests">
+            <AdminLinkingRequests />
           </TabsContent>
           
           <TabsContent value="attendance">

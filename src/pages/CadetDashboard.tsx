@@ -8,7 +8,8 @@ import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import CadetAttendanceMarking from "@/components/CadetAttendanceMarking";
-import { Badge, Calendar, User, Award, Settings, Lock } from "lucide-react";
+import CadetLinkingForm from "@/components/CadetLinkingForm";
+import { Badge, Calendar, User, Award, Settings, Lock, AlertTriangle } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useState } from "react";
 
@@ -75,11 +76,31 @@ const CadetDashboard = () => {
     }
   };
 
+  // Check if user has cadet_id linked
+  const hasLinkedCadet = user?.cadet_id;
+
   return (
     <div className="min-h-screen bg-background">
       <Navigation />
       
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        {!hasLinkedCadet && (
+          <div className="mb-6">
+            <Card className="border-orange-200 bg-orange-50/50">
+              <CardContent className="pt-6">
+                <div className="flex items-center gap-3">
+                  <AlertTriangle className="h-5 w-5 text-orange-600" />
+                  <div>
+                    <h3 className="font-semibold text-orange-900">Account Linking Required</h3>
+                    <p className="text-sm text-orange-700">
+                      Your account is not linked to a cadet record. Please submit a linking request to access all features.
+                    </p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        )}
         <div className="mb-8">
           <h2 className="text-3xl font-bold text-foreground">
             Welcome, {user?.user_metadata?.full_name || 'Cadet'}
@@ -194,11 +215,18 @@ const CadetDashboard = () => {
           </Card>
         </div>
 
-        <Tabs defaultValue="overview" className="w-full">
+        <Tabs defaultValue={hasLinkedCadet ? "overview" : "linking"} className="w-full">
           <TabsList>
+            {!hasLinkedCadet && <TabsTrigger value="linking">Link Account</TabsTrigger>}
             <TabsTrigger value="overview">Overview</TabsTrigger>
-            <TabsTrigger value="attendance">Attendance</TabsTrigger>
+            <TabsTrigger value="attendance" disabled={!hasLinkedCadet}>Attendance</TabsTrigger>
           </TabsList>
+          
+          {!hasLinkedCadet && (
+            <TabsContent value="linking">
+              <CadetLinkingForm />
+            </TabsContent>
+          )}
           
           <TabsContent value="overview">
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
