@@ -160,6 +160,7 @@ const AttendanceManagement = () => {
         .rpc('get_attendance_report', { session_id: sessionId });
 
       if (error) throw error;
+
       // Find the session duration from selectedSession or sessions list
       let sessionDuration = selectedSession?.duration_minutes;
       if (!sessionDuration || sessionDuration <= 0) {
@@ -195,6 +196,7 @@ const AttendanceManagement = () => {
           id: record.id || `${record.cadet_name}-${sessionId}`,
         };
       }));
+
     } catch (error: any) {
       toast({
         title: "Error",

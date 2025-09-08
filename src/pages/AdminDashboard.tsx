@@ -2,6 +2,9 @@ import CadetManagement from "@/components/CadetManagement";
 import { useState, useEffect } from "react";
 import { Navigation } from "@/components/Navigation";
 import { CadetRegistrationForm } from "@/components/CadetRegistrationForm";
+import CadetManagement from "@/components/CadetManagement";
+import AdminLinkingRequests from "@/components/AdminLinkingRequests";
+
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -260,6 +263,7 @@ const AdminDashboard = () => {
           </Card>
         </div>
 
+
   <div className="h-12 sm:h-16 lg:h-20" />
   <Tabs defaultValue="create-account" className="w-full mt-6">
           <div className="w-full mb-20 flex flex-col items-center">
@@ -283,6 +287,7 @@ const AdminDashboard = () => {
                 <CadetRegistrationForm onSuccess={fetchCadets} />
               </div>
             </TabsContent>
+
 
           <TabsContent value="attendance">
             <div className="mb-8 mt-16 sm:mt-0">
