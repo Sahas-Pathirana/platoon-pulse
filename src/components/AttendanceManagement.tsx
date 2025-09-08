@@ -5,6 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -14,6 +15,8 @@ import {
   CheckCircle, AlertCircle, XCircle, Timer
 } from "lucide-react";
 import { format } from "date-fns";
+import jsPDF from "jspdf";
+import autoTable from "jspdf-autotable";
 
 interface PracticeSession {
   id: string;
@@ -35,11 +38,21 @@ interface AttendanceRecord {
   exit_time: string;
   participation_minutes: number;
   attendance_percentage: number;
-  attendance_status: 'present' | 'leave_early' | 'absent';
+  attendance_status: string;
 }
 
 const AttendanceManagement = () => {
+  const [isDownloadDialogOpen, setIsDownloadDialogOpen] = useState(false);
+  const [downloadType, setDownloadType] = useState("");
+  const [selectedPlatoon, setSelectedPlatoon] = useState("");
+  const [selectedCadet, setSelectedCadet] = useState("");
+  const [cadetSearch, setCadetSearch] = useState("");
+  const [filterFrom, setFilterFrom] = useState("");
+  const [filterTo, setFilterTo] = useState("");
+  const [filterPlatoon, setFilterPlatoon] = useState("");
+  const [filterCadet, setFilterCadet] = useState("");
   const { toast } = useToast();
+  const { user } = useAuth();
   const [isLoading, setIsLoading] = useState(false);
   const [sessions, setSessions] = useState<PracticeSession[]>([]);
   const [selectedSession, setSelectedSession] = useState<PracticeSession | null>(null);
@@ -97,6 +110,10 @@ const AttendanceManagement = () => {
 
     setIsLoading(true);
     try {
+      const [sh, sm] = newSession.start_time.split(':').map(Number);
+      const [eh, em] = newSession.end_time.split(':').map(Number);
+      const durationMinutes = (eh * 60 + em) - (sh * 60 + sm);
+
       const { error } = await supabase
         .from('practice_sessions')
         .insert({
@@ -105,6 +122,8 @@ const AttendanceManagement = () => {
           practice_date: newSession.practice_date,
           start_time: newSession.start_time,
           end_time: newSession.end_time,
+          duration_minutes: durationMinutes,
+          created_by: (user?.id as string),
         });
 
       if (error) throw error;
@@ -141,7 +160,41 @@ const AttendanceManagement = () => {
         .rpc('get_attendance_report', { session_id: sessionId });
 
       if (error) throw error;
-      setAttendanceRecords(data || []);
+      // Find the session duration from selectedSession or sessions list
+      let sessionDuration = selectedSession?.duration_minutes;
+      if (!sessionDuration || sessionDuration <= 0) {
+        const sessionObj = sessions.find(s => s.id === sessionId);
+        sessionDuration = sessionObj?.duration_minutes || 0;
+      }
+      setAttendanceRecords((data || []).map(record => {
+        let participation_minutes = 0;
+        if (record.entry_time && record.exit_time) {
+          const [eh, em] = record.exit_time.split(":").map(Number);
+          const [sh, sm] = record.entry_time.split(":").map(Number);
+          participation_minutes = (eh * 60 + em) - (sh * 60 + sm);
+          if (participation_minutes < 0) participation_minutes = 0;
+        }
+        let attendance_percentage = 0;
+        if (sessionDuration > 0) {
+          attendance_percentage = (participation_minutes / sessionDuration) * 100;
+          if (attendance_percentage < 0) attendance_percentage = 0;
+          if (attendance_percentage > 100) attendance_percentage = 100;
+        }
+        // Set attendance status based on percentage
+        let attendance_status = "absent";
+        if (attendance_percentage >= 80) {
+          attendance_status = "present";
+        } else if (attendance_percentage >= 20) {
+          attendance_status = "leave_early";
+        }
+        return {
+          ...record,
+          participation_minutes,
+          attendance_percentage,
+          attendance_status,
+          id: record.id || `${record.cadet_name}-${sessionId}`,
+        };
+      }));
     } catch (error: any) {
       toast({
         title: "Error",
@@ -156,58 +209,50 @@ const AttendanceManagement = () => {
   const generateAttendanceReport = async (session: PracticeSession) => {
     try {
       await fetchAttendanceReport(session.id);
-      
-      const reportData = `Attendance Report - ${session.title}\n`;
-      const reportHeader = `Date: ${format(new Date(session.practice_date), 'PPP')}\n`;
-      const reportTime = `Time: ${session.start_time} - ${session.end_time} (${session.duration_minutes} minutes)\n\n`;
-      
-      const presentCadets = attendanceRecords.filter(r => r.attendance_status === 'present');
-      const leaveEarlyCadets = attendanceRecords.filter(r => r.attendance_status === 'leave_early');
-      const absentCadets = attendanceRecords.filter(r => r.attendance_status === 'absent');
-      
-      let reportContent = reportData + reportHeader + reportTime;
-      
-      reportContent += `SUMMARY:\n`;
-      reportContent += `Present: ${presentCadets.length}\n`;
-      reportContent += `Left Early: ${leaveEarlyCadets.length}\n`;
-      reportContent += `Absent: ${absentCadets.length}\n`;
-      reportContent += `Total Cadets: ${attendanceRecords.length}\n\n`;
-      
-      reportContent += `PRESENT CADETS (80%+ attendance):\n`;
-      reportContent += `${'Name'.padEnd(30)} ${'App No'.padEnd(10)} ${'Platoon'.padEnd(10)} ${'Entry'.padEnd(8)} ${'Exit'.padEnd(8)} ${'%'.padEnd(6)}\n`;
-      reportContent += '-'.repeat(80) + '\n';
-      presentCadets.forEach(cadet => {
-        reportContent += `${cadet.cadet_name.padEnd(30)} ${cadet.application_number.padEnd(10)} ${(cadet.platoon || '').padEnd(10)} ${(cadet.entry_time || '').padEnd(8)} ${(cadet.exit_time || '').padEnd(8)} ${cadet.attendance_percentage.toFixed(1).padEnd(6)}\n`;
-      });
-      
-      reportContent += `\nLEFT EARLY (20-80% attendance):\n`;
-      reportContent += `${'Name'.padEnd(30)} ${'App No'.padEnd(10)} ${'Platoon'.padEnd(10)} ${'Entry'.padEnd(8)} ${'Exit'.padEnd(8)} ${'%'.padEnd(6)}\n`;
-      reportContent += '-'.repeat(80) + '\n';
-      leaveEarlyCadets.forEach(cadet => {
-        reportContent += `${cadet.cadet_name.padEnd(30)} ${cadet.application_number.padEnd(10)} ${(cadet.platoon || '').padEnd(10)} ${(cadet.entry_time || '').padEnd(8)} ${(cadet.exit_time || '').padEnd(8)} ${cadet.attendance_percentage.toFixed(1).padEnd(6)}\n`;
-      });
-      
-      reportContent += `\nABSENT (<20% attendance):\n`;
-      reportContent += `${'Name'.padEnd(30)} ${'App No'.padEnd(10)} ${'Platoon'.padEnd(10)} ${'Entry'.padEnd(8)} ${'Exit'.padEnd(8)} ${'%'.padEnd(6)}\n`;
-      reportContent += '-'.repeat(80) + '\n';
-      absentCadets.forEach(cadet => {
-        reportContent += `${cadet.cadet_name.padEnd(30)} ${cadet.application_number.padEnd(10)} ${(cadet.platoon || '').padEnd(10)} ${(cadet.entry_time || '').padEnd(8)} ${(cadet.exit_time || '').padEnd(8)} ${cadet.attendance_percentage.toFixed(1).padEnd(6)}\n`;
-      });
+      // Filter records
+      let filteredRecords = attendanceRecords;
+      if (filterFrom && filterTo) {
+        filteredRecords = filteredRecords.filter(r => {
+          const date = new Date(session.practice_date);
+          return date >= new Date(filterFrom) && date <= new Date(filterTo);
+        });
+      }
+      if (filterPlatoon) {
+        filteredRecords = filteredRecords.filter(r => r.platoon === filterPlatoon);
+      }
+      if (filterCadet) {
+        filteredRecords = filteredRecords.filter(r => r.cadet_name.toLowerCase().includes(filterCadet.toLowerCase()));
+      }
 
-      // Download the report
-      const blob = new Blob([reportContent], { type: 'text/plain' });
-      const url = window.URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `attendance-report-${session.practice_date}-${session.title.replace(/\s+/g, '-')}.txt`;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      window.URL.revokeObjectURL(url);
+      // Count number of days practices held
+      const daysHeld = sessions.length;
+
+      // Prepare table data
+      const tableData = filteredRecords.map((r, idx) => [
+        r.application_number,
+        r.cadet_name,
+        r.platoon,
+        r.participation_minutes,
+        r.attendance_percentage.toFixed(1) + "%",
+        r.attendance_status,
+        r.attendance_status === "present" ? "Yes" : "No"
+      ]);
+
+      // PDF generation
+      const doc = new jsPDF();
+      doc.text(`Attendance Report - ${session.title}`, 10, 10);
+      doc.text(`Date: ${format(new Date(session.practice_date), 'PPP')}`, 10, 18);
+      doc.text(`Practice Days Held: ${daysHeld}`, 10, 26);
+      autoTable(doc, {
+        head: [["Regiment No.", "Name", "Platoon", "Duration (min)", "Attendance %", "Status", "Eligible"]],
+        body: tableData,
+        startY: 32
+      });
+      doc.save(`attendance-report-${session.practice_date}-${session.title.replace(/\s+/g, '-')}.pdf`);
 
       toast({
         title: "Success",
-        description: "Attendance report downloaded successfully",
+        description: "Attendance report downloaded as PDF",
       });
     } catch (error: any) {
       toast({
@@ -246,6 +291,74 @@ const AttendanceManagement = () => {
 
   return (
     <div className="space-y-6">
+      {/* Download Report Dialog */}
+      <Dialog open={isDownloadDialogOpen} onOpenChange={setIsDownloadDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Download Attendance Report</DialogTitle>
+            <DialogDescription>
+              Select report type and filter options.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="mb-4">
+            <Label>Report Type</Label>
+            <div className="flex gap-4 mt-2">
+              <Button variant={downloadType === "platoon" ? "default" : "outline"} onClick={() => setDownloadType("platoon")}>Platoon</Button>
+              <Button variant={downloadType === "cadet" ? "default" : "outline"} onClick={() => setDownloadType("cadet")}>Cadet</Button>
+            </div>
+          </div>
+          {downloadType === "platoon" && (
+            <div className="mb-4">
+              <Label>Select Platoon</Label>
+              <select className="w-full mt-2 p-2 border rounded" value={selectedPlatoon} onChange={e => setSelectedPlatoon(e.target.value)}>
+                <option value="">-- Select Platoon --</option>
+                {[...new Set(attendanceRecords.map(r => r.platoon).filter(Boolean))].map(platoon => (
+                  <option key={platoon} value={platoon}>{platoon}</option>
+                ))}
+              </select>
+            </div>
+          )}
+          {downloadType === "cadet" && (
+            <div className="mb-4">
+              <Label>Search Cadet Name</Label>
+              <Input
+                type="text"
+                placeholder="Type to search..."
+                value={cadetSearch}
+                onChange={e => setCadetSearch(e.target.value)}
+                className="mt-2"
+              />
+              <select className="w-full mt-2 p-2 border rounded" value={selectedCadet} onChange={e => setSelectedCadet(e.target.value)}>
+                <option value="">-- Select Cadet --</option>
+                {attendanceRecords
+                  .map(r => r.cadet_name)
+                  .filter((name, i, arr) => name && arr.indexOf(name) === i && name.toLowerCase().includes(cadetSearch.toLowerCase()))
+                  .map(name => (
+                    <option key={name} value={name}>{name}</option>
+                  ))}
+              </select>
+            </div>
+          )}
+          <div className="flex justify-end gap-2">
+            <Button variant="outline" onClick={() => setIsDownloadDialogOpen(false)}>Cancel</Button>
+            <Button
+              onClick={() => {
+                setIsDownloadDialogOpen(false);
+                if (downloadType === "platoon" && selectedPlatoon) {
+                  setFilterPlatoon(selectedPlatoon);
+                  setFilterCadet("");
+                  generateAttendanceReport(selectedSession!);
+                } else if (downloadType === "cadet" && selectedCadet) {
+                  setFilterCadet(selectedCadet);
+                  setFilterPlatoon("");
+                  generateAttendanceReport(selectedSession!);
+                }
+              }}
+              disabled={downloadType === "platoon" ? !selectedPlatoon : !selectedCadet}
+            >Download</Button>
+          </div>
+        </DialogContent>
+      </Dialog>
       {/* Practice Sessions Management */}
       <Card>
         <CardHeader>
@@ -403,7 +516,7 @@ const AttendanceManagement = () => {
                 </CardDescription>
               </div>
               <Button 
-                onClick={() => generateAttendanceReport(selectedSession)}
+                onClick={() => setIsDownloadDialogOpen(true)}
                 className="flex items-center gap-2"
                 disabled={isLoading}
               >

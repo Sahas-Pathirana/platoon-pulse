@@ -33,7 +33,7 @@ export const useAuth = () => {
           // Fetch profile to get role
           supabase
             .from('user_profiles')
-            .select('role')
+            .select('role, cadet_id')
             .eq('id', session.user.id)
             .maybeSingle()
             .then(({ data: profile, error }) => {
@@ -45,13 +45,13 @@ export const useAuth = () => {
                 setUser({
                   ...session.user,
                   role: 'student'
-                });
+                } as AuthUser);
               } else {
                 setUser({
                   ...session.user,
                   role: profile?.role || 'student',
-                  cadet_id: profile?.cadet_id
-                });
+                  cadet_id: profile?.cadet_id || undefined,
+                } as AuthUser);
               }
               setLoading(false);
             });

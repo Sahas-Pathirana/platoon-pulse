@@ -28,7 +28,7 @@ export const Navigation = () => {
                   ) : (
                     <User className="h-4 w-4" />
                   )}
-                  <span>{user.email}</span>
+                  <span>{user.user_metadata?.full_name || user.email}</span>
                   <span className="px-2 py-1 bg-primary/10 text-primary rounded-full text-xs">
                     {user.role === 'admin' ? 'Admin' : 'Cadet'}
                   </span>

@@ -29,7 +29,7 @@ interface MyAttendance {
   exit_time: string;
   participation_minutes: number;
   attendance_percentage: number;
-  attendance_status: 'present' | 'leave_early' | 'absent';
+  attendance_status: string;
   marked_at: string;
 }
 
@@ -78,14 +78,33 @@ const CadetAttendanceMarking = () => {
           attendance_percentage,
           attendance_status,
           marked_at
-        `)
-        .eq('cadet_id', user?.cadet_id);
+        `);
+
 
       if (error) throw error;
 
       const attendanceMap: Record<string, MyAttendance> = {};
       data?.forEach(record => {
-        attendanceMap[record.practice_session_id] = record;
+        let participation_minutes = 0;
+        if (record.entry_time && record.exit_time) {
+          const [eh, em] = record.exit_time.split(":").map(Number);
+          const [sh, sm] = record.entry_time.split(":").map(Number);
+          participation_minutes = (eh * 60 + em) - (sh * 60 + sm);
+          if (participation_minutes < 0) participation_minutes = 0;
+        }
+        let attendance_percentage = 0;
+        // Find the session duration
+        const session = sessions.find(s => s.id === record.practice_session_id);
+        if (session && session.duration_minutes > 0) {
+          attendance_percentage = (participation_minutes / session.duration_minutes) * 100;
+          if (attendance_percentage < 0) attendance_percentage = 0;
+          if (attendance_percentage > 100) attendance_percentage = 100;
+        }
+        attendanceMap[record.practice_session_id] = {
+          ...record,
+          participation_minutes,
+          attendance_percentage,
+        };
       });
       setMyAttendance(attendanceMap);
     } catch (error: any) {
@@ -122,11 +141,18 @@ const CadetAttendanceMarking = () => {
         if (error) throw error;
       } else {
         // Create new record
-        const insertData = {
+        let cadetId = user?.cadet_id;
+        if (!cadetId) {
+          const { data: rpcCadetId } = await supabase.rpc('current_cadet_id');
+          cadetId = (rpcCadetId as string | null | undefined) || undefined;
+        }
+
+        const baseData = {
           practice_session_id: sessionId,
-          cadet_id: user?.cadet_id,
-          [type === 'entry' ? 'entry_time' : 'exit_time']: currentTime
-        };
+          ...(type === 'entry' ? { entry_time: currentTime } : { exit_time: currentTime })
+        } as any;
+
+        const insertData = cadetId ? { ...baseData, cadet_id: cadetId } : baseData;
 
         const { error } = await supabase
           .from('cadet_attendance')
@@ -189,14 +215,22 @@ const CadetAttendanceMarking = () => {
         if (error) throw error;
       } else {
         // Create new record
+        let cadetId = user?.cadet_id;
+        if (!cadetId) {
+          const { data: rpcCadetId } = await supabase.rpc('current_cadet_id');
+          cadetId = (rpcCadetId as string | null | undefined) || undefined;
+        }
+
+        const insertPayload = {
+          practice_session_id: sessionId,
+          entry_time: form.entry_time,
+          exit_time: form.exit_time,
+          ...(cadetId ? { cadet_id: cadetId } : {})
+        } as any;
+
         const { error } = await supabase
           .from('cadet_attendance')
-          .insert({
-            practice_session_id: sessionId,
-            cadet_id: user?.cadet_id,
-            entry_time: form.entry_time,
-            exit_time: form.exit_time
-          });
+          .insert(insertPayload);
 
         if (error) throw error;
       }

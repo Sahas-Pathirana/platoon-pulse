@@ -82,6 +82,16 @@ interface AttendanceRecord {
   reason: string;
   excuse_letter_submitted: boolean;
   approval_status: boolean;
+  eligibility?: boolean;
+}
+
+interface ExcuseLetterRecord {
+  id: string;
+  absent_dates: string;
+  number_of_days: number;
+  reason: string;
+  approval_status: boolean;
+  eligibility?: boolean;
 }
 
 interface EventParticipation {
@@ -141,6 +151,7 @@ const CadetManagement = () => {
   const [trainingCamps, setTrainingCamps] = useState<TrainingCamp[]>([]);
   const [performanceEvaluations, setPerformanceEvaluations] = useState<PerformanceEvaluation[]>([]);
   const [attendanceRecords, setAttendanceRecords] = useState<AttendanceRecord[]>([]);
+  const [excuseLetters, setExcuseLetters] = useState<ExcuseLetterRecord[]>([]);
   const [eventParticipations, setEventParticipations] = useState<EventParticipation[]>([]);
   const [foreignVisits, setForeignVisits] = useState<ForeignVisit[]>([]);
   const [medicalRecords, setMedicalRecords] = useState<MedicalRecord[]>([]);
@@ -194,6 +205,7 @@ const CadetManagement = () => {
         trainingRes,
         performanceRes,
         attendanceRes,
+        excuseLettersRes,
         eventsRes,
         foreignRes,
         medicalRes,
@@ -206,6 +218,7 @@ const CadetManagement = () => {
         supabase.from('training_camps').select('*').eq('cadet_id', selectedCadet.id),
         supabase.from('performance_evaluations').select('*').eq('cadet_id', selectedCadet.id),
         supabase.from('attendance_records').select('*').eq('cadet_id', selectedCadet.id),
+        supabase.from('excuse_letters').select('*').eq('cadet_id', selectedCadet.id),
         supabase.from('events_participation').select('*').eq('cadet_id', selectedCadet.id),
         supabase.from('foreign_visits').select('*').eq('cadet_id', selectedCadet.id),
         supabase.from('medical_records').select('*').eq('cadet_id', selectedCadet.id),
@@ -219,6 +232,7 @@ const CadetManagement = () => {
       setTrainingCamps(trainingRes.data || []);
       setPerformanceEvaluations(performanceRes.data || []);
       setAttendanceRecords(attendanceRes.data || []);
+      setExcuseLetters(excuseLettersRes.data || []);
       setEventParticipations(eventsRes.data || []);
       setForeignVisits(foreignRes.data || []);
       setMedicalRecords(medicalRes.data || []);
@@ -266,7 +280,10 @@ const CadetManagement = () => {
     }
   };
 
-  const deleteRecord = async (tableName: 'achievements' | 'disciplinary_actions' | 'educational_qualifications' | 'training_camps', recordId: string) => {
+  const deleteRecord = async (
+    tableName: 'achievements' | 'disciplinary_actions' | 'educational_qualifications' | 'training_camps' | 'attendance_records' | 'excuse_letters',
+    recordId: string
+  ) => {
     if (!confirm("Are you sure you want to delete this record?")) return;
 
     try {
@@ -301,7 +318,7 @@ const CadetManagement = () => {
     switch (activeTab) {
       case "achievements":
         return (
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label>Achievement Type</Label>
               <Input
@@ -347,7 +364,7 @@ const CadetManagement = () => {
 
       case "disciplinary":
         return (
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label>Date of Action</Label>
               <Input
@@ -378,7 +395,7 @@ const CadetManagement = () => {
       case "education":
         return (
           <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2">
+            <div className="space-y-2 col-span-2">
               <Label>Exam Type</Label>
               <Select
                 value={newRecord.exam_type || ''}
@@ -390,11 +407,14 @@ const CadetManagement = () => {
                 <SelectContent>
                   <SelectItem value="GCE O/L">GCE O/L</SelectItem>
                   <SelectItem value="GCE A/L">GCE A/L</SelectItem>
+                  <SelectItem value="1st term">1st term</SelectItem>
+                  <SelectItem value="2nd term">2nd term</SelectItem>
+                  <SelectItem value="3rd term">3rd term</SelectItem>
                   <SelectItem value="Other">Other</SelectItem>
                 </SelectContent>
               </Select>
             </div>
-            <div className="space-y-2">
+            <div className="space-y-2 col-span-2">
               <Label>Year</Label>
               <Input
                 type="number"
@@ -403,7 +423,7 @@ const CadetManagement = () => {
                 placeholder="Exam year"
               />
             </div>
-            <div className="space-y-2">
+            <div className="space-y-2 col-span-2">
               <Label>Index Number</Label>
               <Input
                 value={newRecord.index_number || ''}
@@ -411,21 +431,52 @@ const CadetManagement = () => {
                 placeholder="Index number"
               />
             </div>
-            <div className="space-y-2">
-              <Label>Subject</Label>
-              <Input
-                value={newRecord.subject || ''}
-                onChange={(e) => setNewRecord({...newRecord, subject: e.target.value})}
-                placeholder="Subject name"
-              />
-            </div>
-            <div className="space-y-2">
-              <Label>Grade</Label>
-              <Input
-                value={newRecord.grade || ''}
-                onChange={(e) => setNewRecord({...newRecord, grade: e.target.value})}
-                placeholder="Grade obtained"
-              />
+            <div className="space-y-2 col-span-2">
+              <Label>Subjects & Grades</Label>
+              {(newRecord.subjects || [{ subject: '', grade: '' }]).map((sg: { subject: string; grade: string }, idx: number) => (
+                <div key={idx} className="flex gap-2 mb-2">
+                  <Input
+                    value={sg.subject}
+                    onChange={e => {
+                      const updated = [...(newRecord.subjects || [])];
+                      updated[idx].subject = e.target.value;
+                      setNewRecord({ ...newRecord, subjects: updated });
+                    }}
+                    placeholder="Subject name"
+                    className="w-1/2"
+                  />
+                  <Input
+                    value={sg.grade}
+                    onChange={e => {
+                      const updated = [...(newRecord.subjects || [])];
+                      updated[idx].grade = e.target.value;
+                      setNewRecord({ ...newRecord, subjects: updated });
+                    }}
+                    placeholder="Grade"
+                    className="w-1/2"
+                  />
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      const updated = [...(newRecord.subjects || [])];
+                      updated.splice(idx, 1);
+                      setNewRecord({ ...newRecord, subjects: updated });
+                    }}
+                    className="text-destructive"
+                  >Remove</Button>
+                </div>
+              ))}
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={() => {
+                  setNewRecord({
+                    ...newRecord,
+                    subjects: [...(newRecord.subjects || []), { subject: '', grade: '' }],
+                  });
+                }}
+              >Add Subject</Button>
             </div>
           </div>
         );
@@ -645,6 +696,7 @@ const CadetManagement = () => {
   };
 
   return (
+  
     <div className="space-y-6">
       {/* Cadet Selection */}
       <Card>
@@ -710,123 +762,191 @@ const CadetManagement = () => {
           </CardHeader>
           <CardContent className="space-y-6">
             <Tabs value={activeTab} onValueChange={setActiveTab}>
-              <TabsList className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-8 gap-1">
-                <TabsTrigger value="achievements" className="flex items-center gap-1">
-                  <Award className="h-4 w-4" />
-                  <span className="hidden md:inline">Achievements</span>
-                </TabsTrigger>
-                <TabsTrigger value="disciplinary" className="flex items-center gap-1">
-                  <AlertTriangle className="h-4 w-4" />
-                  <span className="hidden md:inline">Disciplinary</span>
-                </TabsTrigger>
-                <TabsTrigger value="education" className="flex items-center gap-1">
-                  <GraduationCap className="h-4 w-4" />
-                  <span className="hidden md:inline">Education</span>
-                </TabsTrigger>
-                <TabsTrigger value="training" className="flex items-center gap-1">
-                  <Target className="h-4 w-4" />
-                  <span className="hidden md:inline">Training</span>
-                </TabsTrigger>
-                <TabsTrigger value="performance" className="flex items-center gap-1">
-                  <Activity className="h-4 w-4" />
-                  <span className="hidden md:inline">Performance</span>
-                </TabsTrigger>
-                <TabsTrigger value="attendance" className="flex items-center gap-1">
-                  <UserCheck className="h-4 w-4" />
-                  <span className="hidden md:inline">Attendance</span>
-                </TabsTrigger>
-                <TabsTrigger value="events" className="flex items-center gap-1">
-                  <Calendar className="h-4 w-4" />
-                  <span className="hidden md:inline">Events</span>
-                </TabsTrigger>
-                <TabsTrigger value="medical" className="flex items-center gap-1">
-                  <Heart className="h-4 w-4" />
-                  <span className="hidden md:inline">Medical</span>
-                </TabsTrigger>
-              </TabsList>
-
-              {['achievements', 'disciplinary', 'education', 'training'].map((tabKey) => (
-                <TabsContent key={tabKey} value={tabKey} className="space-y-6 mt-6">
-                  <div className="flex justify-between items-center">
-                    <h3 className="text-lg font-semibold">
-                      {tabKey === 'achievements' && 'Achievements & Awards'}
-                      {tabKey === 'disciplinary' && 'Disciplinary Actions'}
-                      {tabKey === 'education' && 'Educational Qualifications'}
-                      {tabKey === 'training' && 'Training Camps'}
-                    </h3>
-                    <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
-                      <DialogTrigger asChild>
-                        <Button onClick={() => setActiveTab(tabKey)}>
-                          <Plus className="h-4 w-4 mr-2" />
-                          Add Record
-                        </Button>
-                      </DialogTrigger>
-                      <DialogContent className="max-w-2xl">
-                        <DialogHeader>
-                          <DialogTitle>Add New Record</DialogTitle>
-                          <DialogDescription>
-                            Add a new {tabKey} record for {selectedCadet.name_full}
-                          </DialogDescription>
-                        </DialogHeader>
-                        <div className="py-4">
-                          {renderRecordForm()}
-                        </div>
-                        <div className="flex justify-end space-x-2">
-                          <Button variant="outline" onClick={() => setIsAddDialogOpen(false)}>
-                            Cancel
-                          </Button>
-                          <Button 
-                            onClick={() => {
-                              const tableMap = {
-                                'achievements': 'achievements' as const,
-                                'disciplinary': 'disciplinary_actions' as const,
-                                'education': 'educational_qualifications' as const,
-                                'training': 'training_camps' as const
-                              };
-                              const tableName = tableMap[tabKey as keyof typeof tableMap];
-                              if (tableName) {
-                                addRecord(tableName, newRecord);
-                              }
-                            }}
-                            disabled={isLoading}
+              <div className="relative flex justify-center min-h-[110px]">
+                <div className="absolute left-0 top-0 w-full h-full bg-muted rounded-lg z-0" />
+                <TabsList
+                  className="flex flex-wrap gap-1 px-0 py-2 min-h-[90px] sm:min-h-[60px] w-full max-w-full items-center relative z-10 justify-center"
+                  style={{ WebkitOverflowScrolling: 'touch' }}
+                >
+                  <TabsTrigger value="achievements" className="flex items-center gap-1 min-w-[90px] sm:min-w-[80px] px-2 py-1 justify-center text-sm">
+                    <Award className="h-4 w-4" />
+                    <span className="ml-1">Achievements</span>
+                  </TabsTrigger>
+                  <TabsTrigger value="disciplinary" className="flex items-center gap-1 min-w-[90px] sm:min-w-[80px] px-2 py-1 justify-center text-sm">
+                    <AlertTriangle className="h-4 w-4" />
+                    <span className="ml-1">Disciplinary</span>
+                  </TabsTrigger>
+                  <TabsTrigger value="education" className="flex items-center gap-1 min-w-[90px] sm:min-w-[80px] px-2 py-1 justify-center text-sm">
+                    <GraduationCap className="h-4 w-4" />
+                    <span className="ml-1">Education</span>
+                  </TabsTrigger>
+                  <TabsTrigger value="training" className="flex items-center gap-1 min-w-[90px] sm:min-w-[80px] px-2 py-1 justify-center text-sm">
+                    <Target className="h-4 w-4" />
+                    <span className="ml-1">Training</span>
+                  </TabsTrigger>
+                  <TabsTrigger value="performance" className="flex items-center gap-1 min-w-[90px] sm:min-w-[80px] px-2 py-1 justify-center text-sm">
+                    <Activity className="h-4 w-4" />
+                    <span className="ml-1">Performance</span>
+                  </TabsTrigger>
+                  <TabsTrigger value="attendance" className="flex items-center gap-1 min-w-[90px] sm:min-w-[80px] px-2 py-1 justify-center text-sm">
+                    <UserCheck className="h-4 w-4" />
+                    <span className="ml-1">Attendance</span>
+                  </TabsTrigger>
+                  <TabsTrigger value="excuse_letters" className="flex items-center gap-1 min-w-[120px] sm:min-w-[100px] px-2 py-1 justify-center text-sm">
+                    <UserCheck className="h-4 w-4" />
+                    <span className="ml-1">Excuse Letters</span>
+                  </TabsTrigger>
+                  <TabsTrigger value="events" className="flex items-center gap-1 min-w-[90px] sm:min-w-[80px] px-2 py-1 justify-center text-sm">
+                    <Calendar className="h-4 w-4" />
+                    <span className="ml-1">Events</span>
+                  </TabsTrigger>
+                  <TabsTrigger value="medical" className="flex items-center gap-1 min-w-[90px] sm:min-w-[80px] px-2 py-1 justify-center text-sm">
+                    <Heart className="h-4 w-4" />
+                    <span className="ml-1">Medical</span>
+                  </TabsTrigger>
+                </TabsList>
+              </div>
+              {/* Achievements Tab Content */}
+              <TabsContent value="achievements" className="space-y-6 mt-6">
+                <div className="flex justify-between items-center mb-2">
+                  <h2 className="text-lg font-semibold">Achievements & Awards</h2>
+                  <Button variant="secondary" onClick={() => { setActiveTab('achievements'); setIsAddDialogOpen(true); }}>
+                    <Plus className="mr-2 h-4 w-4" /> Add Record
+                  </Button>
+                </div>
+                {renderRecordTable()}
+              </TabsContent>
+              <TabsContent value="disciplinary" className="space-y-6 mt-6">
+                <div className="flex justify-between items-center mb-2">
+                  <h2 className="text-lg font-semibold">Disciplinary Actions</h2>
+                  <Button variant="secondary" onClick={() => { setActiveTab('disciplinary'); setIsAddDialogOpen(true); }}>
+                    <Plus className="mr-2 h-4 w-4" /> Add Record
+                  </Button>
+                </div>
+                {renderRecordTable()}
+              </TabsContent>
+              <TabsContent value="education" className="space-y-6 mt-6">
+                <div className="flex justify-between items-center mb-2">
+                  <h2 className="text-lg font-semibold">Educational Qualifications</h2>
+                  <Button variant="secondary" onClick={() => { setActiveTab('education'); setIsAddDialogOpen(true); }}>
+                    <Plus className="mr-2 h-4 w-4" /> Add Record
+                  </Button>
+                </div>
+                {renderRecordTable()}
+              </TabsContent>
+              <TabsContent value="training" className="space-y-6 mt-6">
+                <div className="flex justify-between items-center mb-2">
+                  <h2 className="text-lg font-semibold">Training Camps</h2>
+                  <Button variant="secondary" onClick={() => { setActiveTab('training'); setIsAddDialogOpen(true); }}>
+                    <Plus className="mr-2 h-4 w-4" /> Add Record
+                  </Button>
+                </div>
+                {renderRecordTable()}
+              </TabsContent>
+              {/* Add Record Dialog (rendered once, for the active tab, outside TabsContent) */}
+              <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
+                <DialogContent>
+                  <DialogHeader>
+                    <DialogTitle>Add Record</DialogTitle>
+                    <DialogDescription>Fill in the details below.</DialogDescription>
+                  </DialogHeader>
+                  <form
+                    onSubmit={e => {
+                      e.preventDefault();
+                      if (activeTab === 'achievements') addRecord('achievements', newRecord);
+                      else if (activeTab === 'disciplinary') addRecord('disciplinary_actions', newRecord);
+                      else if (activeTab === 'education') addRecord('educational_qualifications', {
+                        ...newRecord,
+                        subject: (newRecord.subjects && newRecord.subjects.length > 0) ? newRecord.subjects.map(sg => sg.subject).join(', ') : '',
+                        grade: (newRecord.subjects && newRecord.subjects.length > 0) ? newRecord.subjects.map(sg => sg.grade).join(', ') : '',
+                      });
+                      else if (activeTab === 'training') addRecord('training_camps', newRecord);
+                    }}
+                  >
+                    {renderRecordForm()}
+                    <div className="flex justify-end mt-4">
+                      <Button type="submit">Save</Button>
+                    </div>
+                  </form>
+                </DialogContent>
+              </Dialog>
+              {/* Attendance Tab Content */}
+              <TabsContent value="attendance" className="space-y-6 mt-6">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Date</TableHead>
+                      <TableHead>Number of Days</TableHead>
+                      <TableHead>Reason</TableHead>
+                      <TableHead>Approval</TableHead>
+                      <TableHead>Eligibility</TableHead>
+                      <TableHead>Actions</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {attendanceRecords.map((record) => (
+                      <TableRow key={record.id}>
+                        <TableCell>{record.absent_dates}</TableCell>
+                        <TableCell>{record.number_of_days}</TableCell>
+                        <TableCell>{record.reason}</TableCell>
+                        <TableCell>{record.approval_status ? 'Approved' : 'Pending'}</TableCell>
+                        <TableCell>{record.eligibility ? 'Yes' : 'No'}</TableCell>
+                        <TableCell>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => deleteRecord('attendance_records', record.id)}
+                            className="text-destructive"
                           >
-                            {isLoading ? "Adding..." : "Add Record"}
+                            <Trash2 className="h-4 w-4" />
                           </Button>
-                        </div>
-                      </DialogContent>
-                    </Dialog>
-                  </div>
-
-                  <div className="border rounded-lg overflow-hidden">
-                    {renderRecordTable()}
-                  </div>
-                </TabsContent>
-              ))}
-
-              {/* Placeholder tabs for future implementation */}
-              {['performance', 'attendance', 'events', 'medical'].map((tabKey) => (
-                <TabsContent key={tabKey} value={tabKey} className="space-y-6 mt-6">
-                  <Card>
-                    <CardContent className="p-8 text-center">
-                      <h3 className="text-lg font-semibold mb-2">
-                        {tabKey === 'performance' && 'Performance Evaluations'}
-                        {tabKey === 'attendance' && 'Attendance Records'}
-                        {tabKey === 'events' && 'Event Participation'}
-                        {tabKey === 'medical' && 'Medical Records'}
-                      </h3>
-                      <p className="text-muted-foreground">
-                        This section will be implemented soon to manage {tabKey} records for the selected cadet.
-                      </p>
-                    </CardContent>
-                  </Card>
-                </TabsContent>
-              ))}
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </TabsContent>
+              {/* Excuse Letters Tab Content */}
+              <TabsContent value="excuse_letters" className="space-y-6 mt-6">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Date</TableHead>
+                      <TableHead>Number of Days</TableHead>
+                      <TableHead>Reason</TableHead>
+                      <TableHead>Approval</TableHead>
+                      <TableHead>Eligibility</TableHead>
+                      <TableHead>Actions</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {(excuseLetters || []).map((record) => (
+                      <TableRow key={record.id}>
+                        <TableCell>{record.absent_dates}</TableCell>
+                        <TableCell>{record.number_of_days}</TableCell>
+                        <TableCell>{record.reason}</TableCell>
+                        <TableCell>{record.approval_status ? 'Approved' : 'Pending'}</TableCell>
+                        <TableCell>{record.eligibility ? 'Yes' : 'No'}</TableCell>
+                        <TableCell>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => deleteRecord('excuse_letters', record.id)}
+                            className="text-destructive"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </TabsContent>
             </Tabs>
           </CardContent>
         </Card>
       )}
     </div>
   );
-};
-
+}
 export default CadetManagement;
