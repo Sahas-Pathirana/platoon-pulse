@@ -93,11 +93,120 @@ Deno.serve(async (req) => {
 
     if (authError) {
       console.error('Auth error:', authError)
+
+      // Handle case where email already exists: update password, confirm email, and link profile
+      const status = (authError as any)?.status
+      const code = (authError as any)?.code
+      const message = (authError as any)?.message || String(authError)
+
+      if (status === 422 && (code === 'email_exists' || /already been registered/i.test(message))) {
+        // Try to find the existing user by listing users and matching the email
+        try {
+          let existingUser: any = null
+          let page = 1
+          const perPage = 100
+
+          while (true) {
+            const { data: usersData, error: listError } = await supabaseAdmin.auth.admin.listUsers({ page, perPage })
+            if (listError) {
+              console.error('List users error:', listError)
+              break
+            }
+            const match = usersData?.users?.find((u: any) => (u.email || '').toLowerCase() === email.trim().toLowerCase())
+            if (match) {
+              existingUser = match
+              break
+            }
+            if (!usersData?.users || usersData.users.length < perPage) {
+              break
+            }
+            page++
+          }
+
+          if (!existingUser) {
+            return new Response(
+              JSON.stringify({ error: 'Email already registered and user lookup failed' }),
+              {
+                status: 409,
+                headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+              }
+            )
+          }
+
+          // Update existing user password and metadata, confirm email
+          const { error: updError } = await supabaseAdmin.auth.admin.updateUserById(existingUser.id, {
+            password,
+            email_confirm: true,
+            user_metadata: { full_name: sanitizedFullName }
+          })
+
+          if (updError) {
+            console.error('Update existing user error:', updError)
+            return new Response(
+              JSON.stringify({ error: `Existing user found but password update failed: ${updError.message}` }),
+              {
+                status: 400,
+                headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+              }
+            )
+          }
+
+          // Ensure profile exists and link cadet
+          const { error: profileUpsertError } = await supabaseAdmin
+            .from('user_profiles')
+            .upsert(
+              {
+                id: existingUser.id,
+                email: existingUser.email ?? email.trim(),
+                full_name: sanitizedFullName,
+                role: 'student',
+                cadet_id: cadetId,
+              },
+              { onConflict: 'id' }
+            )
+
+          if (profileUpsertError) {
+            console.error('Profile upsert error:', profileUpsertError)
+            return new Response(
+              JSON.stringify({ error: `Profile linking failed: ${profileUpsertError.message}` }),
+              {
+                status: 400,
+                headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+              }
+            )
+          }
+
+          return new Response(
+            JSON.stringify({
+              success: true,
+              message: 'Existing user linked and password set',
+              user: {
+                id: existingUser.id,
+                email: existingUser.email ?? email.trim(),
+              }
+            }),
+            {
+              status: 200,
+              headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+            }
+          )
+        } catch (e: any) {
+          console.error('Error handling existing email:', e)
+          return new Response(
+            JSON.stringify({ error: e?.message || 'Failed to handle existing email' }),
+            {
+              status: 500,
+              headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+            }
+          )
+        }
+      }
+
       return new Response(
-        JSON.stringify({ error: authError.message }),
-        { 
-          status: 400, 
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+        JSON.stringify({ error: message }),
+        {
+          status: 400,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
         }
       )
     }
