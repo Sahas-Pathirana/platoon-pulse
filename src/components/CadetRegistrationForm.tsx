@@ -343,6 +343,11 @@ export const CadetRegistrationForm = ({ onSuccess }: CadetRegistrationFormProps)
       });
 
       if (userError) {
+        // Cleanup created cadet records on failure (keep data consistent)
+        await supabase.from('medical_records').delete().eq('cadet_id', cadetData.id)
+        await supabase.from('family_contacts').delete().eq('cadet_id', cadetData.id)
+        await supabase.from('cadets').delete().eq('id', cadetData.id)
+
         toast({
           title: "Account creation failed",
           description: userError.message || "Edge function error",
@@ -351,6 +356,11 @@ export const CadetRegistrationForm = ({ onSuccess }: CadetRegistrationFormProps)
         return;
       }
       if (userData?.error) {
+        // Cleanup created cadet records on failure (keep data consistent)
+        await supabase.from('medical_records').delete().eq('cadet_id', cadetData.id)
+        await supabase.from('family_contacts').delete().eq('cadet_id', cadetData.id)
+        await supabase.from('cadets').delete().eq('id', cadetData.id)
+
         toast({
           title: "Account creation failed",
           description: userData.error,
