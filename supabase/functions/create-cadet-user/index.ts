@@ -63,8 +63,8 @@ Deno.serve(async (req) => {
       password,
       email_confirm: true, // Skip email confirmation
       user_metadata: {
-        full_name: fullName,
-      },
+        full_name: fullName
+      }
     })
 
     if (authError) {
