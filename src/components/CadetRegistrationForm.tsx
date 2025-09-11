@@ -322,17 +322,42 @@ export const CadetRegistrationForm = ({ onSuccess }: CadetRegistrationFormProps)
       }
 
       // Create auth account
+      // Validate email before invoking edge function
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!emailRegex.test(formData.email)) {
+        toast({
+          title: "Invalid email",
+          description: "Please enter a valid email address to create the account.",
+          variant: "destructive",
+        });
+        return;
+      }
+
       const { data: userData, error: userError } = await supabase.functions.invoke('create-cadet-user', {
         body: {
-          email: formData.email,
+          email: formData.email.trim(),
           password: formData.password,
           fullName: formData.fullName,
           cadetId: cadetData.id,
         },
       });
 
-      if (userError) throw userError;
-      if (userData.error) throw new Error(userData.error);
+      if (userError) {
+        toast({
+          title: "Account creation failed",
+          description: userError.message || "Edge function error",
+          variant: "destructive",
+        });
+        return;
+      }
+      if (userData?.error) {
+        toast({
+          title: "Account creation failed",
+          description: userData.error,
+          variant: "destructive",
+        });
+        return;
+      }
 
       toast({
         title: "Success",
