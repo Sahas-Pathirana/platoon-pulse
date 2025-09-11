@@ -45,6 +45,30 @@ Deno.serve(async (req) => {
       )
     }
 
+    // Validate email format
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+    if (!emailRegex.test(email)) {
+      return new Response(
+        JSON.stringify({ error: 'Invalid email format' }),
+        { 
+          status: 400, 
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+        }
+      )
+    }
+
+    // Sanitize and validate fullName
+    const sanitizedFullName = String(fullName).trim()
+    if (sanitizedFullName.length === 0 || sanitizedFullName.length > 100) {
+      return new Response(
+        JSON.stringify({ error: 'Full name must be between 1 and 100 characters' }),
+        { 
+          status: 400, 
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+        }
+      )
+    }
+
     // Create Supabase admin client using service role key
     const supabaseAdmin = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
@@ -59,11 +83,11 @@ Deno.serve(async (req) => {
 
     // Create the user account with email confirmation disabled
     const { data: authData, error: authError } = await supabaseAdmin.auth.admin.createUser({
-      email,
+      email: email.trim(),
       password,
       email_confirm: true, // Skip email confirmation
       user_metadata: {
-        full_name: fullName
+        full_name: sanitizedFullName
       }
     })
 
@@ -93,8 +117,8 @@ Deno.serve(async (req) => {
       .from('user_profiles')
       .insert({
         id: authData.user.id,
-        email: email,
-        full_name: fullName,
+        email: email.trim(),
+        full_name: sanitizedFullName,
         role: 'student',
         cadet_id: cadetId,
       })
