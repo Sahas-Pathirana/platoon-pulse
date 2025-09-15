@@ -221,16 +221,19 @@ Deno.serve(async (req) => {
       )
     }
 
-    // Create the user profile linking to the cadet
+    // Upsert the user profile linking to the cadet (idempotent)
     const { error: profileError } = await supabaseAdmin
       .from('user_profiles')
-      .insert({
-        id: authData.user.id,
-        email: email.trim(),
-        full_name: sanitizedFullName,
-        role: 'student',
-        cadet_id: cadetId,
-      })
+      .upsert(
+        {
+          id: authData.user.id,
+          email: email.trim(),
+          full_name: sanitizedFullName,
+          role: 'student',
+          cadet_id: cadetId,
+        },
+        { onConflict: 'id' }
+      )
 
     if (profileError) {
       console.error('Profile error:', profileError)
