@@ -384,7 +384,7 @@ const AdminDashboard = () => {
         const { data: fnData, error: fnError } = await supabase.functions.invoke('create-cadet-user', {
           body: {
             email: selectedCadetForApproval.email,
-            password: selectedCadetForApproval.temporary_password || selectedCadetForApproval.application_number,
+            password: selectedCadetForApproval.application_number,
             fullName: selectedCadetForApproval.name_full,
             cadetId: inserted.id,
           },
