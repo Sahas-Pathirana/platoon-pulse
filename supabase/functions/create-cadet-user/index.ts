@@ -37,6 +37,19 @@ Deno.serve(async (req: Request): Promise<Response> => {
     // Get the request body
     const { email, password, fullName, cadetId }: CreateCadetUserRequest = await req.json()
 
+    // Normalize password to satisfy Supabase minimum length (6)
+    const rawPwd = String(password ?? '')
+    let safePassword = rawPwd
+    if (rawPwd.length < 6) {
+      if (rawPwd.length === 0) {
+        // Generate a random 8-char password if none provided
+        safePassword = Math.random().toString(36).slice(2, 10)
+      } else {
+        // Pad with zeros to reach minimum length
+        safePassword = rawPwd.padEnd(6, '0')
+      }
+    }
+
     // Validate required fields
     if (!email || !password || !fullName || !cadetId) {
       return new Response(
@@ -87,7 +100,7 @@ Deno.serve(async (req: Request): Promise<Response> => {
     // Create the user account with email confirmation disabled
     const { data: authData, error: authError } = await supabaseAdmin.auth.admin.createUser({
       email: email.trim(),
-      password,
+      password: safePassword,
       email_confirm: true, // Skip email confirmation
       user_metadata: {
         full_name: sanitizedFullName
@@ -138,7 +151,7 @@ Deno.serve(async (req: Request): Promise<Response> => {
 
           // Update existing user password and metadata, confirm email
           const { error: updError } = await supabaseAdmin.auth.admin.updateUserById(existingUser.id, {
-            password,
+            password: safePassword,
             email_confirm: true,
             user_metadata: { full_name: sanitizedFullName }
           })
@@ -183,6 +196,7 @@ Deno.serve(async (req: Request): Promise<Response> => {
             JSON.stringify({
               success: true,
               message: 'Existing user linked and password set',
+              initialPassword: safePassword,
               user: {
                 id: existingUser.id,
                 email: existingUser.email ?? email.trim(),
@@ -257,6 +271,7 @@ Deno.serve(async (req: Request): Promise<Response> => {
       JSON.stringify({ 
         success: true, 
         message: 'Cadet account created successfully',
+        initialPassword: safePassword,
         user: { 
           id: authData.user.id, 
           email: authData.user.email 

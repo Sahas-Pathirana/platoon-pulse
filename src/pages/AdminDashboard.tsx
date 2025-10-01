@@ -380,31 +380,34 @@ const AdminDashboard = () => {
       if (insertError) throw insertError;
 
       // Create user account using the Supabase Edge Function (uses logged-in admin auth)
-      try {
-        const { data: fnData, error: fnError } = await supabase.functions.invoke('create-cadet-user', {
-          body: {
-            email: selectedCadetForApproval.email,
-            password: selectedCadetForApproval.application_number,
-            fullName: selectedCadetForApproval.name_full,
-            cadetId: inserted.id,
-          },
-        });
+      const { data: fnData, error: fnError } = await supabase.functions.invoke('create-cadet-user', {
+        body: {
+          email: selectedCadetForApproval.email,
+          password: selectedCadetForApproval.application_number,
+          fullName: selectedCadetForApproval.name_full,
+          cadetId: inserted.id,
+        },
+      });
 
-        if (fnError) {
-          console.error('User creation failed:', fnError);
-          // Continue with approval even if user creation fails
-        }
-      } catch (userError) {
-        console.error('Error creating user:', userError);
-        // Continue with approval even if user creation fails
+      if (fnError || !fnData?.success) {
+        console.error('User creation failed:', fnError || fnData);
+        toast({
+          title: 'User creation failed',
+          description: (fnError as any)?.message || (fnData as any)?.error || 'Could not create login for the cadet. Approval not finalized.',
+          variant: 'destructive',
+        });
+        setIsPendingLoading(false);
+        return;
       }
+
+      const initialPassword = (fnData as any).initialPassword || selectedCadetForApproval.application_number;
 
       // Remove from pending_cadets
       await supabase.from('pending_cadets').delete().eq('id', selectedCadetForApproval.id);
       
       toast({ 
         title: 'Approved', 
-        description: `Cadet ${selectedCadetForApproval.name_full} approved and assigned to ${selectedPlatoonForApproval === 'none' ? 'No Platoon' : selectedPlatoonForApproval}` 
+        description: `Cadet ${selectedCadetForApproval.name_full} approved and assigned to ${selectedPlatoonForApproval === 'none' ? 'No Platoon' : selectedPlatoonForApproval}. Initial password: ${initialPassword}` 
       });
       
       // Update UI immediately by removing from pending cadets list
