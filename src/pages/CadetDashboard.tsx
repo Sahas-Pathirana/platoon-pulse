@@ -1,3 +1,4 @@
+
 import { Navigation } from "@/components/Navigation";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -10,11 +11,31 @@ import { supabase } from "@/integrations/supabase/client";
 import CadetAttendanceMarking from "@/components/CadetAttendanceMarking";
 import { Badge, Calendar, User, Award, Settings, Lock, AlertTriangle } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 
 const CadetDashboard = () => {
   const { user } = useAuth();
+  const [cadetDetails, setCadetDetails] = useState<any>(null);
   const { toast } = useToast();
+
+  // Fetch cadet details from Supabase
+  useEffect(() => {
+    const fetchCadetDetails = async () => {
+      let cadetId = user?.cadet_id;
+      if (!cadetId) {
+        const { data: rpcCadetId } = await supabase.rpc('current_cadet_id');
+        cadetId = rpcCadetId as string;
+      }
+      if (!cadetId) return;
+      const { data, error } = await supabase
+        .from('cadets')
+        .select('*')
+        .eq('id', cadetId)
+        .single();
+      if (!error && data) setCadetDetails(data);
+    };
+    fetchCadetDetails();
+  }, [user?.cadet_id]);
   const [isPasswordDialogOpen, setIsPasswordDialogOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [passwordForm, setPasswordForm] = useState({
@@ -22,6 +43,38 @@ const CadetDashboard = () => {
     newPassword: '',
     confirmPassword: ''
   });
+  const [attendancePercentage, setAttendancePercentage] = useState<number>(0);
+
+  // Fetch and calculate average attendance percentage
+  const fetchAttendancePercentage = async () => {
+    let cadetId = user?.cadet_id;
+    if (!cadetId) {
+      const { data: rpcCadetId } = await supabase.rpc('current_cadet_id');
+      cadetId = rpcCadetId as string;
+    }
+    if (!cadetId) return;
+    const { data, error } = await supabase
+      .from('cadet_attendance')
+      .select('attendance_percentage, entry_time, exit_time')
+      .eq('cadet_id', cadetId);
+    if (error || !data || data.length === 0) {
+      setAttendancePercentage(0);
+      return;
+    }
+    // Only include sessions with both entry and exit times
+    const validRecords = data.filter((record: any) => record.entry_time && record.exit_time);
+    if (validRecords.length === 0) {
+      setAttendancePercentage(0);
+      return;
+    }
+    const total = validRecords.reduce((sum: number, record: any) => sum + (record.attendance_percentage || 0), 0);
+    const avg = total / validRecords.length;
+    setAttendancePercentage(Number.isFinite(avg) ? avg : 0);
+  };
+
+  useEffect(() => {
+    fetchAttendancePercentage();
+  }, [user?.cadet_id]);
 
   const handlePasswordUpdate = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -100,7 +153,22 @@ const CadetDashboard = () => {
             </Card>
           </div>
         )}
-        <div className="mb-8">
+        <div className="mb-8 flex flex-col items-center justify-center">
+          {/* Profile Photo Avatar */}
+          <div className="mb-4">
+            {cadetDetails?.photograph_url ? (
+              <img
+                src={cadetDetails.photograph_url}
+                alt="Profile"
+                className="h-28 w-28 rounded-full object-cover border-4 border-primary shadow"
+                style={{ background: '#f3f4f6' }}
+              />
+            ) : (
+              <div className="h-28 w-28 rounded-full bg-muted flex items-center justify-center border-4 border-primary shadow">
+                <User className="h-14 w-14 text-muted-foreground" />
+              </div>
+            )}
+          </div>
           <h2 className="text-3xl font-bold text-foreground">
             Welcome, {user?.user_metadata?.full_name || 'Cadet'}
           </h2>
@@ -197,7 +265,7 @@ const CadetDashboard = () => {
               <Calendar className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">0%</div>
+              <div className="text-2xl font-bold">{attendancePercentage.toFixed(1)}%</div>
               <p className="text-xs text-muted-foreground">This term</p>
             </CardContent>
           </Card>
@@ -214,11 +282,12 @@ const CadetDashboard = () => {
           </Card>
         </div>
 
+
         <Tabs defaultValue={hasLinkedCadet ? "overview" : "linking"} className="w-full">
           <TabsList>
             {!hasLinkedCadet && <TabsTrigger value="linking">Link Account</TabsTrigger>}
             <TabsTrigger value="overview">Overview</TabsTrigger>
-            <TabsTrigger value="attendance" disabled={!hasLinkedCadet}>Attendance</TabsTrigger>
+            <TabsTrigger value="attendance" disabled={false}>Attendance</TabsTrigger>
           </TabsList>
           
           <TabsContent value="overview">
@@ -240,15 +309,38 @@ const CadetDashboard = () => {
                     </div>
                     <div>
                       <span className="text-sm font-medium text-muted-foreground">Application Number:</span>
-                      <p className="text-sm">To be assigned</p>
+                      <p className="text-sm">{cadetDetails?.application_number || 'To be assigned'}</p>
                     </div>
                     <div>
                       <span className="text-sm font-medium text-muted-foreground">Date of Birth:</span>
-                      <p className="text-sm">To be updated</p>
+                      <p className="text-sm">{cadetDetails?.dob || 'To be updated'}</p>
                     </div>
                   </div>
                 </CardContent>
               </Card>
+
+              {/* Non-editable section for all admin-entered details */}
+              {cadetDetails && (
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Account Details (Admin Entered)</CardTitle>
+                    <CardDescription>These details cannot be edited</CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="space-y-2">
+                      <div><span className="font-medium">Full Name:</span> <span>{cadetDetails.name_full}</span></div>
+                      <div><span className="font-medium">Name with Initials:</span> <span>{cadetDetails.name_with_initials}</span></div>
+                      <div><span className="font-medium">Application Number:</span> <span>{cadetDetails.application_number}</span></div>
+                      <div><span className="font-medium">Platoon:</span> <span>{cadetDetails.platoon}</span></div>
+                      <div><span className="font-medium">Rank:</span> <span>{cadetDetails.rank}</span></div>
+                      <div><span className="font-medium">Date of Birth:</span> <span>{cadetDetails.dob}</span></div>
+                      <div><span className="font-medium">Contact Number:</span> <span>{cadetDetails.contact_number}</span></div>
+                      <div><span className="font-medium">Address:</span> <span>{cadetDetails.address}</span></div>
+                      {/* Add more fields as needed based on your cadets table */}
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
               
               <Card>
                 <CardHeader>
@@ -283,7 +375,11 @@ const CadetDashboard = () => {
           </TabsContent>
           
           <TabsContent value="attendance">
-            <CadetAttendanceMarking />
+            <CadetAttendanceMarking onAttendanceMarked={() => {
+              setTimeout(() => {
+                fetchAttendancePercentage();
+              }, 500);
+            }} />
           </TabsContent>
         </Tabs>
       </div>

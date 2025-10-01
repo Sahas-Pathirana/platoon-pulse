@@ -16,15 +16,20 @@ import {
   GraduationCap, Calendar, Activity, FileText, 
   Heart, UserCheck, Plane, Trophy, BookOpen, Target
 } from "lucide-react";
+  import { Globe } from "lucide-react";
 
 interface Cadet {
   id: string;
   name_full: string;
-  name_with_initials: string;
   application_number: string;
   platoon: string;
   rank: string;
-  age: number;
+  master_remarks?: string;
+  rector_recommendations?: string;
+  withdrawal_reason?: string;
+  withdrawal_date_from?: string;
+  withdrawal_date_to?: string;
+  battalion_acceptance_date?: string;
 }
 
 interface Achievement {
@@ -77,11 +82,22 @@ interface PerformanceEvaluation {
 
 interface AttendanceRecord {
   id: string;
+  cadet_id: string;
   absent_dates: string;
   number_of_days: number;
   reason: string;
   excuse_letter_submitted: boolean;
   approval_status: boolean;
+  eligibility?: boolean;
+}
+
+interface ExcuseLetterRecord {
+  id: string;
+  absent_dates: string;
+  number_of_days: number;
+  reason: string;
+  approval_status: boolean;
+  eligibility?: boolean;
 }
 
 interface EventParticipation {
@@ -94,11 +110,13 @@ interface EventParticipation {
 
 interface ForeignVisit {
   id: string;
+  cadet_id: string;
   country: string;
   event_name: string;
   duration_from: string;
   duration_to: string;
   remarks: string;
+  created_at?: string;
 }
 
 interface MedicalRecord {
@@ -128,6 +146,15 @@ interface Promotion {
 }
 
 const CadetManagement = () => {
+interface SpecialEvent {
+  id: string;
+  cadet_id: string;
+  duration_from: string;
+  duration_to: string;
+  event_name: string;
+  role_description: string;
+  created_at: string;
+}
   const { toast } = useToast();
   const [selectedCadet, setSelectedCadet] = useState<Cadet | null>(null);
   const [cadets, setCadets] = useState<Cadet[]>([]);
@@ -141,16 +168,54 @@ const CadetManagement = () => {
   const [trainingCamps, setTrainingCamps] = useState<TrainingCamp[]>([]);
   const [performanceEvaluations, setPerformanceEvaluations] = useState<PerformanceEvaluation[]>([]);
   const [attendanceRecords, setAttendanceRecords] = useState<AttendanceRecord[]>([]);
-  const [eventParticipations, setEventParticipations] = useState<EventParticipation[]>([]);
+  const [excuseLetters, setExcuseLetters] = useState<ExcuseLetterRecord[]>([]);
+  // const [eventParticipations, setEventParticipations] = useState<EventParticipation[]>([]); // Not used, replaced by specialEvents
+  const [specialEvents, setSpecialEvents] = useState<SpecialEvent[]>([]);
   const [foreignVisits, setForeignVisits] = useState<ForeignVisit[]>([]);
   const [medicalRecords, setMedicalRecords] = useState<MedicalRecord[]>([]);
   const [termEvaluations, setTermEvaluations] = useState<TermEvaluation[]>([]);
   const [promotions, setPromotions] = useState<Promotion[]>([]);
 
+  // Attendance Report Dialog states
+  const [isAttendanceReportDialogOpen, setIsAttendanceReportDialogOpen] = useState(false);
+  const [attendanceReportType, setAttendanceReportType] = useState('platoon');
+  const [attendanceReportPlatoon, setAttendanceReportPlatoon] = useState('');
+  const [attendanceReportCadet, setAttendanceReportCadet] = useState('');
+  const [attendanceReportFrom, setAttendanceReportFrom] = useState('');
+  const [attendanceReportTo, setAttendanceReportTo] = useState('');
+
   // Form states
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [activeTab, setActiveTab] = useState("achievements");
   const [newRecord, setNewRecord] = useState<any>({});
+  // Handler for attendance report download
+  const handleDownloadAttendanceReport = async () => {
+    let filteredRecords: AttendanceRecord[] = [];
+    if (attendanceReportType === 'platoon') {
+      filteredRecords = attendanceRecords.filter(r => selectedCadet && selectedCadet.platoon === attendanceReportPlatoon);
+    } else if (attendanceReportType === 'cadet') {
+      filteredRecords = attendanceRecords.filter(r => r.cadet_id === attendanceReportCadet);
+    }
+    if (attendanceReportFrom && attendanceReportTo) {
+      filteredRecords = filteredRecords.filter(r => {
+        const date = new Date(r.absent_dates);
+        return date >= new Date(attendanceReportFrom) && date <= new Date(attendanceReportTo);
+      });
+    }
+    // Generate PDF (simple example, you can use jsPDF/autotable for more advanced)
+    let reportText = `Attendance Report\n\n`;
+    filteredRecords.forEach(r => {
+      reportText += `Date: ${r.absent_dates}, Days: ${r.number_of_days}, Reason: ${r.reason}, Approved: ${r.approval_status ? 'Yes' : 'No'}, Eligible: ${r.eligibility ? 'Yes' : 'No'}\n`;
+    });
+    const blob = new Blob([reportText], { type: 'text/plain' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'attendance-report.txt';
+    a.click();
+    URL.revokeObjectURL(url);
+    setIsAttendanceReportDialogOpen(false);
+  };
 
   useEffect(() => {
     fetchCadets();
@@ -166,11 +231,11 @@ const CadetManagement = () => {
     try {
       const { data, error } = await supabase
         .from('cadets')
-        .select('id, name_full, name_with_initials, application_number, platoon, rank, age')
+        .select('id, name_full, name_with_initials, application_number, platoon, rank, age, status')
         .order('name_full');
 
       if (error) throw error;
-      setCadets(data || []);
+  setCadets(data || []);
     } catch (error: any) {
       toast({
         title: "Error",
@@ -179,6 +244,31 @@ const CadetManagement = () => {
       });
     }
   };
+  // ...pending cadet handlers removed...
+  // Example Pending Cadets Table (add this to your render/UI where appropriate)
+  // <Table>
+  //   <TableHeader>
+  //     <TableRow>
+  //       <TableHead>Name</TableHead>
+  //       <TableHead>Application Number</TableHead>
+  //       <TableHead>Platoon</TableHead>
+  //       <TableHead>Actions</TableHead>
+  //     </TableRow>
+  //   </TableHeader>
+  //   <TableBody>
+  //     {pendingCadets.map(cadet => (
+  //       <TableRow key={cadet.id}>
+  //         <TableCell>{cadet.name_full}</TableCell>
+  //         <TableCell>{cadet.application_number}</TableCell>
+  //         <TableCell>{cadet.platoon}</TableCell>
+  //         <TableCell>
+  //           <Button onClick={() => handleApproveCadet(cadet)}>Approve</Button>
+  //           <Button variant="destructive" onClick={() => handleRejectCadet(cadet)}>Reject</Button>
+  //         </TableCell>
+  //       </TableRow>
+  //     ))}
+  //   </TableBody>
+  // </Table>
 
   const fetchCadetRecords = async () => {
     if (!selectedCadet) return;
@@ -194,7 +284,8 @@ const CadetManagement = () => {
         trainingRes,
         performanceRes,
         attendanceRes,
-        eventsRes,
+        excuseLettersRes,
+        specialEventsRes,
         foreignRes,
         medicalRes,
         termRes,
@@ -206,24 +297,26 @@ const CadetManagement = () => {
         supabase.from('training_camps').select('*').eq('cadet_id', selectedCadet.id),
         supabase.from('performance_evaluations').select('*').eq('cadet_id', selectedCadet.id),
         supabase.from('attendance_records').select('*').eq('cadet_id', selectedCadet.id),
-        supabase.from('events_participation').select('*').eq('cadet_id', selectedCadet.id),
+        supabase.from('excuse_letters').select('*').eq('cadet_id', selectedCadet.id),
+        supabase.from('special_events').select('*').eq('cadet_id', selectedCadet.id),
         supabase.from('foreign_visits').select('*').eq('cadet_id', selectedCadet.id),
         supabase.from('medical_records').select('*').eq('cadet_id', selectedCadet.id),
         supabase.from('term_evaluations').select('*').eq('cadet_id', selectedCadet.id),
         supabase.from('promotions').select('*').eq('cadet_id', selectedCadet.id)
       ]);
 
-      setAchievements(achievementsRes.data || []);
-      setDisciplinaryActions(disciplinaryRes.data || []);
-      setEducationalQualifications(educationalRes.data || []);
-      setTrainingCamps(trainingRes.data || []);
-      setPerformanceEvaluations(performanceRes.data || []);
-      setAttendanceRecords(attendanceRes.data || []);
-      setEventParticipations(eventsRes.data || []);
-      setForeignVisits(foreignRes.data || []);
-      setMedicalRecords(medicalRes.data || []);
-      setTermEvaluations(termRes.data || []);
-      setPromotions(promotionsRes.data || []);
+    setAchievements(achievementsRes.data || []);
+    setDisciplinaryActions(disciplinaryRes.data || []);
+    setEducationalQualifications(educationalRes.data || []);
+    setTrainingCamps(trainingRes.data || []);
+    setPerformanceEvaluations(performanceRes.data || []);
+    setAttendanceRecords(attendanceRes.data || []);
+    setExcuseLetters(excuseLettersRes.data || []);
+    setSpecialEvents(specialEventsRes.data || []);
+    setForeignVisits(foreignRes.data || []);
+    setMedicalRecords(medicalRes.data || []);
+    setTermEvaluations(termRes.data || []);
+    setPromotions(promotionsRes.data || []);
 
     } catch (error: any) {
       toast({
@@ -236,37 +329,84 @@ const CadetManagement = () => {
     }
   };
 
-  const addRecord = async (tableName: 'achievements' | 'disciplinary_actions' | 'educational_qualifications' | 'training_camps', recordData: any) => {
-    if (!selectedCadet) return;
+  const addRecord = async (
+  tableName: 'achievements' | 'disciplinary_actions' | 'educational_qualifications' | 'training_camps' | 'performance_evaluations' | 'special_events' | 'cadets' | 'foreign_visits',
+    recordData: any
+  ) => {
+    // If adding a cadet, ensure status is set to 'pending'
+    if (tableName === 'cadets') {
+      recordData.status = 'pending';
+    }
+    if (!selectedCadet && tableName !== 'cadets') return;
 
     try {
       setIsLoading(true);
-      const { error } = await supabase
-        .from(tableName)
-        .insert({ ...recordData, cadet_id: selectedCadet.id });
 
-      if (error) throw error;
+      // Special handling for educational qualifications with multiple subjects
+      if (tableName === 'educational_qualifications' && Array.isArray(recordData.subjects) && recordData.subjects.length > 0) {
+        // Build multiple rows, one per subject/grade. Skip empty entries.
+        const rows = recordData.subjects
+          .filter((sg: any) => sg && (sg.subject || sg.grade))
+          .map((sg: any) => ({
+            cadet_id: selectedCadet.id,
+            exam_type: recordData.exam_type || null,
+            year: recordData.year || null,
+            index_number: recordData.index_number || null,
+            subject: sg.subject || null,
+            grade: sg.grade || null,
+          }));
+
+        if (rows.length === 0) {
+          throw new Error('No valid subjects provided');
+        }
+
+        const { error } = await supabase.from('educational_qualifications').insert(rows);
+        if (error) throw error;
+      } else {
+        // Single-row insert for other tables or when no subjects array provided
+        let payload = { ...recordData };
+        if (tableName !== 'cadets') {
+          payload.cadet_id = selectedCadet.id;
+        }
+        // If subjects exists but is not an array, remove it to avoid schema errors
+        if (payload.subjects) delete payload.subjects;
+
+        const { error } = await supabase
+          .from(tableName)
+          .insert(payload);
+
+        if (error) throw error;
+      }
 
       toast({
-        title: "Success",
-        description: "Record added successfully",
+        title: 'Success',
+        description: 'Record added successfully',
       });
 
       setIsAddDialogOpen(false);
       setNewRecord({});
-      fetchCadetRecords();
+      if (tableName === 'cadets') {
+        fetchCadets();
+      } else {
+        fetchCadetRecords();
+      }
     } catch (error: any) {
       toast({
-        title: "Error",
-        description: "Failed to add record: " + error.message,
-        variant: "destructive",
+        title: 'Error',
+        description: 'Failed to add record: ' + (error?.message || String(error)),
+        variant: 'destructive',
       });
     } finally {
       setIsLoading(false);
     }
   };
 
-  const deleteRecord = async (tableName: 'achievements' | 'disciplinary_actions' | 'educational_qualifications' | 'training_camps', recordId: string) => {
+  const deleteRecord = async (
+    tableName: 'achievements' | 'disciplinary_actions' | 'educational_qualifications' | 'training_camps' | 'attendance_records' | 'excuse_letters' | 'performance_evaluations' | 'special_events' | 'foreign_visits',
+    recordId: string
+  ) => {
+
+              // ...existing code...
     if (!confirm("Are you sure you want to delete this record?")) return;
 
     try {
@@ -300,15 +440,31 @@ const CadetManagement = () => {
   const renderRecordForm = () => {
     switch (activeTab) {
       case "achievements":
+        // Use allowed values for achievement_type (update as per your Supabase check constraint)
+        const achievementTypeOptions = [
+          "Certificate",
+          "Medal",
+          "Trophy",
+          "Badge",
+          "Other"
+        ];
         return (
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label>Achievement Type</Label>
-              <Input
+              <Select
                 value={newRecord.achievement_type || ''}
-                onChange={(e) => setNewRecord({...newRecord, achievement_type: e.target.value})}
-                placeholder="Certificate, Medal, Trophy, etc."
-              />
+                onValueChange={(value) => setNewRecord({ ...newRecord, achievement_type: value })}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select achievement type" />
+                </SelectTrigger>
+                <SelectContent>
+                  {achievementTypeOptions.map((type) => (
+                    <SelectItem key={type} value={type}>{type}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
             <div className="space-y-2">
               <Label>Date Achieved</Label>
@@ -347,7 +503,7 @@ const CadetManagement = () => {
 
       case "disciplinary":
         return (
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label>Date of Action</Label>
               <Input
@@ -378,7 +534,7 @@ const CadetManagement = () => {
       case "education":
         return (
           <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2">
+            <div className="space-y-2 col-span-2">
               <Label>Exam Type</Label>
               <Select
                 value={newRecord.exam_type || ''}
@@ -390,11 +546,14 @@ const CadetManagement = () => {
                 <SelectContent>
                   <SelectItem value="GCE O/L">GCE O/L</SelectItem>
                   <SelectItem value="GCE A/L">GCE A/L</SelectItem>
+                  <SelectItem value="1st term">1st term</SelectItem>
+                  <SelectItem value="2nd term">2nd term</SelectItem>
+                  <SelectItem value="3rd term">3rd term</SelectItem>
                   <SelectItem value="Other">Other</SelectItem>
                 </SelectContent>
               </Select>
             </div>
-            <div className="space-y-2">
+            <div className="space-y-2 col-span-2">
               <Label>Year</Label>
               <Input
                 type="number"
@@ -403,7 +562,7 @@ const CadetManagement = () => {
                 placeholder="Exam year"
               />
             </div>
-            <div className="space-y-2">
+            <div className="space-y-2 col-span-2">
               <Label>Index Number</Label>
               <Input
                 value={newRecord.index_number || ''}
@@ -411,21 +570,52 @@ const CadetManagement = () => {
                 placeholder="Index number"
               />
             </div>
-            <div className="space-y-2">
-              <Label>Subject</Label>
-              <Input
-                value={newRecord.subject || ''}
-                onChange={(e) => setNewRecord({...newRecord, subject: e.target.value})}
-                placeholder="Subject name"
-              />
-            </div>
-            <div className="space-y-2">
-              <Label>Grade</Label>
-              <Input
-                value={newRecord.grade || ''}
-                onChange={(e) => setNewRecord({...newRecord, grade: e.target.value})}
-                placeholder="Grade obtained"
-              />
+            <div className="space-y-2 col-span-2">
+              <Label>Subjects & Grades</Label>
+              {(newRecord.subjects || [{ subject: '', grade: '' }]).map((sg: { subject: string; grade: string }, idx: number) => (
+                <div key={idx} className="flex gap-2 mb-2">
+                  <Input
+                    value={sg.subject}
+                    onChange={e => {
+                      const updated = [...(newRecord.subjects || [])];
+                      updated[idx].subject = e.target.value;
+                      setNewRecord({ ...newRecord, subjects: updated });
+                    }}
+                    placeholder="Subject name"
+                    className="w-1/2"
+                  />
+                  <Input
+                    value={sg.grade}
+                    onChange={e => {
+                      const updated = [...(newRecord.subjects || [])];
+                      updated[idx].grade = e.target.value;
+                      setNewRecord({ ...newRecord, subjects: updated });
+                    }}
+                    placeholder="Grade"
+                    className="w-1/2"
+                  />
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      const updated = [...(newRecord.subjects || [])];
+                      updated.splice(idx, 1);
+                      setNewRecord({ ...newRecord, subjects: updated });
+                    }}
+                    className="text-destructive"
+                  >Remove</Button>
+                </div>
+              ))}
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={() => {
+                  setNewRecord({
+                    ...newRecord,
+                    subjects: [...(newRecord.subjects || []), { subject: '', grade: '' }],
+                  });
+                }}
+              >Add Subject</Button>
             </div>
           </div>
         );
@@ -494,6 +684,117 @@ const CadetManagement = () => {
           </div>
         );
 
+      case "performance":
+        const scoreOptions = ["1", "2", "3", "4"];
+        return (
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label>Date</Label>
+              <Input
+                type="date"
+                value={newRecord.evaluation_date || ''}
+                onChange={(e) => setNewRecord({ ...newRecord, evaluation_date: e.target.value })}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Squad Drill</Label>
+              <select
+                className="w-full p-2 border rounded"
+                value={newRecord.squad_drill || ''}
+                onChange={e => setNewRecord({ ...newRecord, squad_drill: e.target.value })}
+                required
+              >
+                <option value="">Select score</option>
+                {scoreOptions.map(opt => <option key={opt} value={opt}>{opt}</option>)}
+              </select>
+            </div>
+            <div className="space-y-2">
+              <Label>Physical Training</Label>
+              <select
+                className="w-full p-2 border rounded"
+                value={newRecord.physical_training || ''}
+                onChange={e => setNewRecord({ ...newRecord, physical_training: e.target.value })}
+                required
+              >
+                <option value="">Select score</option>
+                {scoreOptions.map(opt => <option key={opt} value={opt}>{opt}</option>)}
+              </select>
+            </div>
+            <div className="space-y-2">
+              <Label>Assual</Label>
+              <select
+                className="w-full p-2 border rounded"
+                value={newRecord.assual || ''}
+                onChange={e => setNewRecord({ ...newRecord, assual: e.target.value })}
+                required
+              >
+                <option value="">Select score</option>
+                {scoreOptions.map(opt => <option key={opt} value={opt}>{opt}</option>)}
+              </select>
+            </div>
+            <div className="space-y-2">
+              <Label>Drama</Label>
+              <select
+                className="w-full p-2 border rounded"
+                value={newRecord.drama || ''}
+                onChange={e => setNewRecord({ ...newRecord, drama: e.target.value })}
+                required
+              >
+                <option value="">Select score</option>
+                {scoreOptions.map(opt => <option key={opt} value={opt}>{opt}</option>)}
+              </select>
+            </div>
+            <div className="space-y-2">
+              <Label>Presentation</Label>
+              <select
+                className="w-full p-2 border rounded"
+                value={newRecord.presentation || ''}
+                onChange={e => setNewRecord({ ...newRecord, presentation: e.target.value })}
+                required
+              >
+                <option value="">Select score</option>
+                {scoreOptions.map(opt => <option key={opt} value={opt}>{opt}</option>)}
+              </select>
+            </div>
+            <div className="space-y-2">
+              <Label>Regimental Duties</Label>
+              <select
+                className="w-full p-2 border rounded"
+                value={newRecord.regimental_duties || ''}
+                onChange={e => setNewRecord({ ...newRecord, regimental_duties: e.target.value })}
+                required
+              >
+                <option value="">Select score</option>
+                {scoreOptions.map(opt => <option key={opt} value={opt}>{opt}</option>)}
+              </select>
+            </div>
+            <div className="space-y-2">
+              <Label>NCC Knowledge</Label>
+              <select
+                className="w-full p-2 border rounded"
+                value={newRecord.ncc_knowledge || ''}
+                onChange={e => setNewRecord({ ...newRecord, ncc_knowledge: e.target.value })}
+                required
+              >
+                <option value="">Select score</option>
+                {scoreOptions.map(opt => <option key={opt} value={opt}>{opt}</option>)}
+              </select>
+            </div>
+            <div className="space-y-2">
+              <Label>First Aid</Label>
+              <select
+                className="w-full p-2 border rounded"
+                value={newRecord.first_aid || ''}
+                onChange={e => setNewRecord({ ...newRecord, first_aid: e.target.value })}
+                required
+              >
+                <option value="">Select score</option>
+                {scoreOptions.map(opt => <option key={opt} value={opt}>{opt}</option>)}
+              </select>
+            </div>
+          </div>
+        );
+
       default:
         return <div>Select a record type to add</div>;
     }
@@ -506,10 +807,11 @@ const CadetManagement = () => {
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Type</TableHead>
+                <TableHead>Achievement Type</TableHead>
+                <TableHead>Date Achieved</TableHead>
                 <TableHead>Description</TableHead>
-                <TableHead>Date</TableHead>
-                <TableHead>Camp/Event</TableHead>
+                <TableHead>Camp/Event Name</TableHead>
+                <TableHead>Certificate Number</TableHead>
                 <TableHead>Actions</TableHead>
               </TableRow>
             </TableHeader>
@@ -517,9 +819,10 @@ const CadetManagement = () => {
               {achievements.map((achievement) => (
                 <TableRow key={achievement.id}>
                   <TableCell>{achievement.achievement_type}</TableCell>
-                  <TableCell>{achievement.achievement_description}</TableCell>
                   <TableCell>{achievement.date_achieved}</TableCell>
+                  <TableCell>{achievement.achievement_description}</TableCell>
                   <TableCell>{achievement.camp_name}</TableCell>
+                  <TableCell>{achievement.certificate_no}</TableCell>
                   <TableCell>
                     <Button
                       variant="outline"
@@ -613,6 +916,7 @@ const CadetManagement = () => {
                 <TableHead>Level</TableHead>
                 <TableHead>Location</TableHead>
                 <TableHead>Duration</TableHead>
+                <TableHead>Remarks</TableHead>
                 <TableHead>Actions</TableHead>
               </TableRow>
             </TableHeader>
@@ -623,6 +927,7 @@ const CadetManagement = () => {
                   <TableCell>{camp.camp_level}</TableCell>
                   <TableCell>{camp.location}</TableCell>
                   <TableCell>{camp.duration_from} to {camp.duration_to}</TableCell>
+                  <TableCell>{camp.remarks}</TableCell>
                   <TableCell>
                     <Button
                       variant="outline"
@@ -639,14 +944,154 @@ const CadetManagement = () => {
           </Table>
         );
 
+      case "performance":
+        return (
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Date</TableHead>
+                <TableHead>Squad Drill</TableHead>
+                <TableHead>Physical Training</TableHead>
+                <TableHead>Assual</TableHead>
+                <TableHead>Drama</TableHead>
+                <TableHead>Presentation</TableHead>
+                <TableHead>Regimental Duties</TableHead>
+                <TableHead>NCC Knowledge</TableHead>
+                <TableHead>First Aid</TableHead>
+                <TableHead>Actions</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {performanceEvaluations.map((record) => (
+                <TableRow key={record.id}>
+                  <TableCell>{record.evaluation_date}</TableCell>
+                  <TableCell>{record.squad_drill}</TableCell>
+                  <TableCell>{record.physical_training}</TableCell>
+                  <TableCell>{record.assual}</TableCell>
+                  <TableCell>{record.drama}</TableCell>
+                  <TableCell>{record.presentation}</TableCell>
+                  <TableCell>{record.regimental_duties}</TableCell>
+                  <TableCell>{record.ncc_knowledge}</TableCell>
+                  <TableCell>{record.first_aid}</TableCell>
+                  <TableCell>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => deleteRecord('performance_evaluations', record.id)}
+                      className="text-destructive"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        );
+
+      case "foreign":
+        return (
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label>Country</Label>
+              <Input
+                value={newRecord.country || ''}
+                onChange={e => setNewRecord({ ...newRecord, country: e.target.value })}
+                placeholder="Country"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Event Name</Label>
+              <Input
+                value={newRecord.event_name || ''}
+                onChange={e => setNewRecord({ ...newRecord, event_name: e.target.value })}
+                placeholder="Event Name"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Duration From</Label>
+              <Input
+                type="date"
+                value={newRecord.duration_from || ''}
+                onChange={e => setNewRecord({ ...newRecord, duration_from: e.target.value })}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Duration To</Label>
+              <Input
+                type="date"
+                value={newRecord.duration_to || ''}
+                onChange={e => setNewRecord({ ...newRecord, duration_to: e.target.value })}
+              />
+            </div>
+            <div className="space-y-2 col-span-2">
+              <Label>Remarks</Label>
+              <Textarea
+                value={newRecord.remarks || ''}
+                onChange={e => setNewRecord({ ...newRecord, remarks: e.target.value })}
+                placeholder="Remarks"
+              />
+            </div>
+          </div>
+        );
       default:
         return <div>Select a record type to view</div>;
+      {/* Foreign Visits Tab Content */}
+      <TabsContent value="foreign" className="space-y-6 mt-6">
+        <div className="flex justify-between items-center mb-2">
+          <h2 className="text-lg font-semibold">Foreign Visits</h2>
+          <Button variant="secondary" onClick={() => { setActiveTab('foreign'); setIsAddDialogOpen(true); }}>
+            <Plus className="mr-2 h-4 w-4" /> Add Visit
+          </Button>
+        </div>
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>Country</TableHead>
+              <TableHead>Event Name</TableHead>
+              <TableHead>Duration From</TableHead>
+              <TableHead>Duration To</TableHead>
+              <TableHead>Remarks</TableHead>
+              <TableHead>Actions</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {foreignVisits.length === 0 && (
+              <TableRow>
+                <TableCell colSpan={7} className="text-center text-muted-foreground">No foreign visits found.</TableCell>
+              </TableRow>
+            )}
+            {foreignVisits.map((visit) => (
+              <TableRow key={visit.id}>
+                <TableCell>{visit.country}</TableCell>
+                <TableCell>{visit.event_name}</TableCell>
+                <TableCell>{visit.duration_from}</TableCell>
+                <TableCell>{visit.duration_to}</TableCell>
+                <TableCell>{visit.remarks}</TableCell>
+                <TableCell>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => deleteRecord('foreign_visits', visit.id)}
+                    className="text-destructive"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                </TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      </TabsContent>
     }
   };
 
   return (
+
     <div className="space-y-6">
-      {/* Cadet Selection */}
+      {/* Pending Cadets Table */}
+      {/* Pending cadets UI removed */}
+      {/* Cadet Selection & Records Management (existing UI) */}
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
@@ -709,124 +1154,570 @@ const CadetManagement = () => {
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-6">
+            {/* Admin Fields Section - Certificate & Withdrawal */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
+              <div className="space-y-2">
+                <Label>Platoon</Label>
+                <Input
+                  value={selectedCadet.platoon || ''}
+                  onChange={e => setSelectedCadet({ ...selectedCadet, platoon: e.target.value })}
+                  placeholder="Platoon"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Rank</Label>
+                <Input
+                  value={selectedCadet.rank || ''}
+                  onChange={e => setSelectedCadet({ ...selectedCadet, rank: e.target.value })}
+                  placeholder="Rank"
+                />
+              </div>
+              <div className="space-y-2 col-span-2">
+                <Label>Master's Remarks for Final Certificate</Label>
+                <Textarea
+                  value={selectedCadet.master_remarks || ''}
+                  onChange={e => setSelectedCadet({ ...selectedCadet, master_remarks: e.target.value })}
+                  placeholder="Master in charge remarks for the issuance of the final certificate"
+                />
+              </div>
+              <div className="space-y-2 col-span-2">
+                <Label>Rector's/Principal's Recommendations</Label>
+                <Textarea
+                  value={selectedCadet.rector_recommendations || ''}
+                  onChange={e => setSelectedCadet({ ...selectedCadet, rector_recommendations: e.target.value })}
+                  placeholder="Recommendations of the Rector/Principal to issue the final certificate"
+                />
+              </div>
+              <div className="space-y-2 col-span-2">
+                <Label>Withdrawal Reason</Label>
+                <Input
+                  value={selectedCadet.withdrawal_reason || ''}
+                  onChange={e => setSelectedCadet({ ...selectedCadet, withdrawal_reason: e.target.value })}
+                  placeholder="Reason for withdrawal (if applicable)"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Withdrawal Date From</Label>
+                <Input
+                  type="date"
+                  value={selectedCadet.withdrawal_date_from || ''}
+                  onChange={e => setSelectedCadet({ ...selectedCadet, withdrawal_date_from: e.target.value })}
+                  placeholder="mm/dd/yyyy"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Withdrawal Date To</Label>
+                <Input
+                  type="date"
+                  value={selectedCadet.withdrawal_date_to || ''}
+                  onChange={e => setSelectedCadet({ ...selectedCadet, withdrawal_date_to: e.target.value })}
+                  placeholder="mm/dd/yyyy"
+                />
+              </div>
+              <div className="space-y-2 col-span-2">
+                <Label>Battalion Acceptance Date</Label>
+                <Input
+                  type="date"
+                  value={selectedCadet.battalion_acceptance_date || ''}
+                  onChange={e => setSelectedCadet({ ...selectedCadet, battalion_acceptance_date: e.target.value })}
+                  placeholder="mm/dd/yyyy"
+                />
+              </div>
+              <Button
+                className="col-span-2 mt-2"
+                onClick={async () => {
+                  // Save updated admin fields to Supabase
+                  try {
+                    setIsLoading(true);
+                    const { error } = await supabase
+                      .from('cadets')
+                      .update({
+                        platoon: selectedCadet.platoon,
+                        rank: selectedCadet.rank,
+                        master_remarks: selectedCadet.master_remarks,
+                        rector_recommendations: selectedCadet.rector_recommendations,
+                        withdrawal_reason: selectedCadet.withdrawal_reason,
+                        withdrawal_date_from: selectedCadet.withdrawal_date_from,
+                        withdrawal_date_to: selectedCadet.withdrawal_date_to,
+                        battalion_acceptance_date: selectedCadet.battalion_acceptance_date,
+                      })
+                      .eq('id', selectedCadet.id);
+                    if (error) throw error;
+                    toast({ title: 'Success', description: 'Cadet details updated.' });
+                    fetchCadets();
+                  } catch (error: any) {
+                    toast({ title: 'Error', description: error.message, variant: 'destructive' });
+                  } finally {
+                    setIsLoading(false);
+                  }
+                }}
+              >Save Details</Button>
+            </div>
             <Tabs value={activeTab} onValueChange={setActiveTab}>
-              <TabsList className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-8 gap-1">
-                <TabsTrigger value="achievements" className="flex items-center gap-1">
-                  <Award className="h-4 w-4" />
-                  <span className="hidden md:inline">Achievements</span>
-                </TabsTrigger>
-                <TabsTrigger value="disciplinary" className="flex items-center gap-1">
-                  <AlertTriangle className="h-4 w-4" />
-                  <span className="hidden md:inline">Disciplinary</span>
-                </TabsTrigger>
-                <TabsTrigger value="education" className="flex items-center gap-1">
-                  <GraduationCap className="h-4 w-4" />
-                  <span className="hidden md:inline">Education</span>
-                </TabsTrigger>
-                <TabsTrigger value="training" className="flex items-center gap-1">
-                  <Target className="h-4 w-4" />
-                  <span className="hidden md:inline">Training</span>
-                </TabsTrigger>
-                <TabsTrigger value="performance" className="flex items-center gap-1">
-                  <Activity className="h-4 w-4" />
-                  <span className="hidden md:inline">Performance</span>
-                </TabsTrigger>
-                <TabsTrigger value="attendance" className="flex items-center gap-1">
-                  <UserCheck className="h-4 w-4" />
-                  <span className="hidden md:inline">Attendance</span>
-                </TabsTrigger>
-                <TabsTrigger value="events" className="flex items-center gap-1">
-                  <Calendar className="h-4 w-4" />
-                  <span className="hidden md:inline">Events</span>
-                </TabsTrigger>
-                <TabsTrigger value="medical" className="flex items-center gap-1">
-                  <Heart className="h-4 w-4" />
-                  <span className="hidden md:inline">Medical</span>
-                </TabsTrigger>
-              </TabsList>
-
-              {['achievements', 'disciplinary', 'education', 'training'].map((tabKey) => (
-                <TabsContent key={tabKey} value={tabKey} className="space-y-6 mt-6">
-                  <div className="flex justify-between items-center">
-                    <h3 className="text-lg font-semibold">
-                      {tabKey === 'achievements' && 'Achievements & Awards'}
-                      {tabKey === 'disciplinary' && 'Disciplinary Actions'}
-                      {tabKey === 'education' && 'Educational Qualifications'}
-                      {tabKey === 'training' && 'Training Camps'}
-                    </h3>
-                    <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
-                      <DialogTrigger asChild>
-                        <Button onClick={() => setActiveTab(tabKey)}>
-                          <Plus className="h-4 w-4 mr-2" />
-                          Add Record
-                        </Button>
-                      </DialogTrigger>
-                      <DialogContent className="max-w-2xl">
-                        <DialogHeader>
-                          <DialogTitle>Add New Record</DialogTitle>
-                          <DialogDescription>
-                            Add a new {tabKey} record for {selectedCadet.name_full}
-                          </DialogDescription>
-                        </DialogHeader>
-                        <div className="py-4">
-                          {renderRecordForm()}
-                        </div>
-                        <div className="flex justify-end space-x-2">
-                          <Button variant="outline" onClick={() => setIsAddDialogOpen(false)}>
-                            Cancel
-                          </Button>
-                          <Button 
-                            onClick={() => {
-                              const tableMap = {
-                                'achievements': 'achievements' as const,
-                                'disciplinary': 'disciplinary_actions' as const,
-                                'education': 'educational_qualifications' as const,
-                                'training': 'training_camps' as const
-                              };
-                              const tableName = tableMap[tabKey as keyof typeof tableMap];
-                              if (tableName) {
-                                addRecord(tableName, newRecord);
-                              }
-                            }}
-                            disabled={isLoading}
+              <div className="relative flex justify-center min-h-[110px]">
+                <div className="absolute left-0 top-0 w-full h-full bg-muted rounded-lg z-0" />
+                <TabsList
+                  className="flex flex-wrap gap-1 px-0 py-2 min-h-[90px] sm:min-h-[60px] w-full max-w-full items-center relative z-10 justify-center"
+                  style={{ WebkitOverflowScrolling: 'touch' }}
+                >
+                  <TabsTrigger value="achievements" className="flex items-center gap-1 min-w-[90px] sm:min-w-[80px] px-2 py-1 justify-center text-sm">
+                    <Award className="h-4 w-4" />
+                    <span className="ml-1">Achievements</span>
+                  </TabsTrigger>
+                  <TabsTrigger value="disciplinary" className="flex items-center gap-1 min-w-[90px] sm:min-w-[80px] px-2 py-1 justify-center text-sm">
+                    <AlertTriangle className="h-4 w-4" />
+                    <span className="ml-1">Disciplinary</span>
+                  </TabsTrigger>
+                  <TabsTrigger value="education" className="flex items-center gap-1 min-w-[90px] sm:min-w-[80px] px-2 py-1 justify-center text-sm">
+                    <GraduationCap className="h-4 w-4" />
+                    <span className="ml-1">Education</span>
+                  </TabsTrigger>
+                  <TabsTrigger value="training" className="flex items-center gap-1 min-w-[90px] sm:min-w-[80px] px-2 py-1 justify-center text-sm">
+                    <Target className="h-4 w-4" />
+                    <span className="ml-1">Training</span>
+                  </TabsTrigger>
+                  <TabsTrigger value="performance" className="flex items-center gap-1 min-w-[90px] sm:min-w-[80px] px-2 py-1 justify-center text-sm">
+                    <Activity className="h-4 w-4" />
+                    <span className="ml-1">Performance</span>
+                  </TabsTrigger>
+                  <TabsTrigger value="attendance" className="flex items-center gap-1 min-w-[90px] sm:min-w-[80px] px-2 py-1 justify-center text-sm">
+                    <UserCheck className="h-4 w-4" />
+                    <span className="ml-1">Attendance</span>
+                  </TabsTrigger>
+                  <TabsTrigger value="excuse_letters" className="flex items-center gap-1 min-w-[120px] sm:min-w-[100px] px-2 py-1 justify-center text-sm">
+                    <UserCheck className="h-4 w-4" />
+                    <span className="ml-1">Excuse Letters</span>
+                  </TabsTrigger>
+                  <TabsTrigger value="events" className="flex items-center gap-1 min-w-[90px] sm:min-w-[80px] px-2 py-1 justify-center text-sm">
+                    <Calendar className="h-4 w-4" />
+                    <span className="ml-1">Events</span>
+                  </TabsTrigger>
+                  <TabsTrigger value="medical" className="flex items-center gap-1 min-w-[90px] sm:min-w-[80px] px-2 py-1 justify-center text-sm">
+                    <Heart className="h-4 w-4" />
+                    <span className="ml-1">Medical</span>
+                  </TabsTrigger>
+                  <TabsTrigger value="foreign" className="flex items-center gap-1 min-w-[120px] sm:min-w-[100px] px-2 py-1 justify-center text-sm">
+                    <Globe className="h-4 w-4" />
+                    <span className="ml-1">Foreign Visits</span>
+                  </TabsTrigger>
+                </TabsList>
+              </div>
+              {/* Achievements Tab Content */}
+              <TabsContent value="achievements" className="space-y-6 mt-6">
+                <div className="flex justify-between items-center mb-2">
+                  <h2 className="text-lg font-semibold">Achievements & Awards</h2>
+                  <Button variant="secondary" onClick={() => { setActiveTab('achievements'); setIsAddDialogOpen(true); }}>
+                    <Plus className="mr-2 h-4 w-4" /> Add Record
+                  </Button>
+                </div>
+                {renderRecordTable()}
+              </TabsContent>
+              {/* Special Events Tab Content - now after menu bar, matching Achievements */}
+              <TabsContent value="events" className="space-y-6 mt-6">
+                <div className="flex justify-between items-center mb-2">
+                  <h2 className="text-lg font-semibold">Special Events</h2>
+                  <Button variant="secondary" onClick={() => setIsAddDialogOpen(true)}>
+                    <Plus className="mr-2 h-4 w-4" /> Add Event
+                  </Button>
+                </div>
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Event Name</TableHead>
+                      <TableHead>Role Description</TableHead>
+                      <TableHead>Duration From</TableHead>
+                      <TableHead>Duration To</TableHead>
+                      <TableHead>Created At</TableHead>
+                      <TableHead>Actions</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {specialEvents.length === 0 && (
+                      <TableRow>
+                        <TableCell colSpan={6} className="text-center text-muted-foreground">No special events found.</TableCell>
+                      </TableRow>
+                    )}
+                    {specialEvents.map((event) => (
+                      <TableRow key={event.id}>
+                        <TableCell>{event.event_name}</TableCell>
+                        <TableCell>{event.role_description}</TableCell>
+                        <TableCell>{event.duration_from}</TableCell>
+                        <TableCell>{event.duration_to}</TableCell>
+                        <TableCell>{event.created_at ? event.created_at.split('T')[0] : ''}</TableCell>
+                        <TableCell>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => deleteRecord('special_events', event.id)}
+                            className="text-destructive"
                           >
-                            {isLoading ? "Adding..." : "Add Record"}
+                            <Trash2 className="h-4 w-4" />
                           </Button>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </TabsContent>
+              {/* Foreign Visits Tab Content */}
+              <TabsContent value="foreign" className="space-y-6 mt-6">
+                <div className="flex justify-between items-center mb-2">
+                  <h2 className="text-lg font-semibold">Foreign Visits</h2>
+                  <Button variant="secondary" onClick={() => { setActiveTab('foreign'); setIsAddDialogOpen(true); }}>
+                    <Plus className="mr-2 h-4 w-4" /> Add Visit
+                  </Button>
+                </div>
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Country</TableHead>
+                      <TableHead>Event Name</TableHead>
+                      <TableHead>Duration From</TableHead>
+                      <TableHead>Duration To</TableHead>
+                      <TableHead>Remarks</TableHead>
+                      <TableHead>Actions</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {foreignVisits.length === 0 && (
+                      <TableRow>
+                        <TableCell colSpan={6} className="text-center text-muted-foreground">No foreign visits found.</TableCell>
+                      </TableRow>
+                    )}
+                    {foreignVisits.map((visit) => (
+                      <TableRow key={visit.id}>
+                        <TableCell>{visit.country}</TableCell>
+                        <TableCell>{visit.event_name}</TableCell>
+                        <TableCell>{visit.duration_from}</TableCell>
+                        <TableCell>{visit.duration_to}</TableCell>
+                        <TableCell>{visit.remarks}</TableCell>
+                        <TableCell>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => deleteRecord('foreign_visits', visit.id)}
+                            className="text-destructive"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </TabsContent>
+              <TabsContent value="performance" className="space-y-6 mt-6">
+                <div className="flex justify-between items-center mb-2">
+                  <h2 className="text-lg font-semibold">Performance</h2>
+                  <Button variant="secondary" onClick={() => { setActiveTab('performance'); setIsAddDialogOpen(true); }}>
+                    <Plus className="mr-2 h-4 w-4" /> Add Record
+                  </Button>
+                </div>
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Date</TableHead>
+                      <TableHead>Squad Drill</TableHead>
+                      <TableHead>Physical Training</TableHead>
+                      <TableHead>Assual</TableHead>
+                      <TableHead>Drama</TableHead>
+                      <TableHead>Presentation</TableHead>
+                      <TableHead>Regimental Duties</TableHead>
+                      <TableHead>NCC Knowledge</TableHead>
+                      <TableHead>First Aid</TableHead>
+                      <TableHead>Actions</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {performanceEvaluations.map((record) => (
+                      <TableRow key={record.id}>
+                        <TableCell>{record.evaluation_date}</TableCell>
+                        <TableCell>{record.squad_drill}</TableCell>
+                        <TableCell>{record.physical_training}</TableCell>
+                        <TableCell>{record.assual}</TableCell>
+                        <TableCell>{record.drama}</TableCell>
+                        <TableCell>{record.presentation}</TableCell>
+                        <TableCell>{record.regimental_duties}</TableCell>
+                        <TableCell>{record.ncc_knowledge}</TableCell>
+                        <TableCell>{record.first_aid}</TableCell>
+                        <TableCell>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => deleteRecord('performance_evaluations', record.id)}
+                            className="text-destructive"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </TabsContent>
+              <TabsContent value="disciplinary" className="space-y-6 mt-6">
+                <div className="flex justify-between items-center mb-2">
+                  <h2 className="text-lg font-semibold">Disciplinary Actions</h2>
+                  <Button variant="secondary" onClick={() => { setActiveTab('disciplinary'); setIsAddDialogOpen(true); }}>
+                    <Plus className="mr-2 h-4 w-4" /> Add Record
+                  </Button>
+                </div>
+                {renderRecordTable()}
+              </TabsContent>
+              <TabsContent value="education" className="space-y-6 mt-6">
+                <div className="flex justify-between items-center mb-2">
+                  <h2 className="text-lg font-semibold">Educational Qualifications</h2>
+                  <Button variant="secondary" onClick={() => { setActiveTab('education'); setIsAddDialogOpen(true); }}>
+                    <Plus className="mr-2 h-4 w-4" /> Add Record
+                  </Button>
+                </div>
+                {renderRecordTable()}
+              </TabsContent>
+              <TabsContent value="training" className="space-y-6 mt-6">
+                <div className="flex justify-between items-center mb-2">
+                  <h2 className="text-lg font-semibold">Training Camps</h2>
+                  <Button variant="secondary" onClick={() => { setActiveTab('training'); setIsAddDialogOpen(true); }}>
+                    <Plus className="mr-2 h-4 w-4" /> Add Record
+                  </Button>
+                </div>
+                {renderRecordTable()}
+              </TabsContent>
+              {/* Add Record Dialog (rendered once, for the active tab, outside TabsContent) */}
+              <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
+                <DialogContent>
+                  <DialogHeader>
+                    <DialogTitle>Add Record</DialogTitle>
+                    <DialogDescription>Fill in the details below.</DialogDescription>
+                  </DialogHeader>
+                  <form
+                    onSubmit={e => {
+                      e.preventDefault();
+                      if (activeTab === 'achievements') addRecord('achievements', newRecord);
+                      else if (activeTab === 'disciplinary') addRecord('disciplinary_actions', newRecord);
+                      else if (activeTab === 'performance') addRecord('performance_evaluations', newRecord);
+                      else if (activeTab === 'education') addRecord('educational_qualifications', {
+                        ...newRecord,
+                        subject: (newRecord.subjects && newRecord.subjects.length > 0) ? newRecord.subjects.map(sg => sg.subject).join(', ') : '',
+                        grade: (newRecord.subjects && newRecord.subjects.length > 0) ? newRecord.subjects.map(sg => sg.grade).join(', ') : '',
+                      });
+                      else if (activeTab === 'training') addRecord('training_camps', newRecord);
+                      else if (activeTab === 'events') addRecord('special_events', newRecord);
+                      else if (activeTab === 'foreign') addRecord('foreign_visits', newRecord);
+                    }}
+                  >
+                    {/* Only render the form fields once for all tabs except events and foreign, which have custom fields */}
+                    {activeTab === 'events' ? (
+                      <>
+                        <div className="space-y-2">
+                          <Label>Event Name</Label>
+                          <Input value={newRecord.event_name || ''} onChange={e => setNewRecord({ ...newRecord, event_name: e.target.value })} required />
                         </div>
-                      </DialogContent>
-                    </Dialog>
-                  </div>
-
-                  <div className="border rounded-lg overflow-hidden">
-                    {renderRecordTable()}
-                  </div>
-                </TabsContent>
-              ))}
-
-              {/* Placeholder tabs for future implementation */}
-              {['performance', 'attendance', 'events', 'medical'].map((tabKey) => (
-                <TabsContent key={tabKey} value={tabKey} className="space-y-6 mt-6">
-                  <Card>
-                    <CardContent className="p-8 text-center">
-                      <h3 className="text-lg font-semibold mb-2">
-                        {tabKey === 'performance' && 'Performance Evaluations'}
-                        {tabKey === 'attendance' && 'Attendance Records'}
-                        {tabKey === 'events' && 'Event Participation'}
-                        {tabKey === 'medical' && 'Medical Records'}
-                      </h3>
-                      <p className="text-muted-foreground">
-                        This section will be implemented soon to manage {tabKey} records for the selected cadet.
-                      </p>
-                    </CardContent>
-                  </Card>
-                </TabsContent>
-              ))}
+                        <div className="space-y-2">
+                          <Label>Role Description</Label>
+                          <Input value={newRecord.role_description || ''} onChange={e => setNewRecord({ ...newRecord, role_description: e.target.value })} required />
+                        </div>
+                        <div className="space-y-2">
+                          <Label>Duration From</Label>
+                          <Input type="date" value={newRecord.duration_from || ''} onChange={e => setNewRecord({ ...newRecord, duration_from: e.target.value })} required />
+                        </div>
+                        <div className="space-y-2">
+                          <Label>Duration To</Label>
+                          <Input type="date" value={newRecord.duration_to || ''} onChange={e => setNewRecord({ ...newRecord, duration_to: e.target.value })} required />
+                        </div>
+                      </>
+                    ) : activeTab === 'foreign' ? (
+                      <div className="grid grid-cols-2 gap-4">
+                        <div className="space-y-2">
+                          <Label>Country</Label>
+                          <Input
+                            value={newRecord.country || ''}
+                            onChange={e => setNewRecord({ ...newRecord, country: e.target.value })}
+                            placeholder="Country"
+                            required
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <Label>Event Name</Label>
+                          <Input
+                            value={newRecord.event_name || ''}
+                            onChange={e => setNewRecord({ ...newRecord, event_name: e.target.value })}
+                            placeholder="Event Name"
+                            required
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <Label>Duration From</Label>
+                          <Input
+                            type="date"
+                            value={newRecord.duration_from || ''}
+                            onChange={e => setNewRecord({ ...newRecord, duration_from: e.target.value })}
+                            required
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <Label>Duration To</Label>
+                          <Input
+                            type="date"
+                            value={newRecord.duration_to || ''}
+                            onChange={e => setNewRecord({ ...newRecord, duration_to: e.target.value })}
+                            required
+                          />
+                        </div>
+                        <div className="space-y-2 col-span-2">
+                          <Label>Remarks</Label>
+                          <Textarea
+                            value={newRecord.remarks || ''}
+                            onChange={e => setNewRecord({ ...newRecord, remarks: e.target.value })}
+                            placeholder="Remarks"
+                          />
+                        </div>
+                      </div>
+                    ) : renderRecordForm()}
+                    <div className="flex justify-end mt-4">
+                      <Button type="submit">Save</Button>
+                    </div>
+                  </form>
+                </DialogContent>
+              </Dialog>
+              {/* Attendance Tab Content */}
+              <TabsContent value="attendance" className="space-y-6 mt-6">
+                <div className="flex justify-between items-center mb-2">
+                  <h2 className="text-lg font-semibold">Attendance Records</h2>
+                  <Button variant="secondary" onClick={() => setIsAttendanceReportDialogOpen(true)}>
+                    <FileText className="mr-2 h-4 w-4" /> Attendance Report
+                  </Button>
+                </div>
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Date</TableHead>
+                      <TableHead>Number of Days</TableHead>
+                      <TableHead>Reason</TableHead>
+                      <TableHead>Approval</TableHead>
+                      <TableHead>Eligibility</TableHead>
+                      <TableHead>Actions</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {attendanceRecords.map((record) => (
+                      <TableRow key={record.id}>
+                        <TableCell>{record.absent_dates}</TableCell>
+                        <TableCell>{record.number_of_days}</TableCell>
+                        <TableCell>{record.reason}</TableCell>
+                        <TableCell>{record.approval_status ? 'Approved' : 'Pending'}</TableCell>
+                        <TableCell>{record.eligibility ? 'Yes' : 'No'}</TableCell>
+                        <TableCell>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => deleteRecord('attendance_records', record.id)}
+                            className="text-destructive"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+                {/* Attendance Report Dialog */}
+                <Dialog open={isAttendanceReportDialogOpen} onOpenChange={setIsAttendanceReportDialogOpen}>
+                  <DialogContent>
+                    <DialogHeader>
+                      <DialogTitle>Download Attendance Report</DialogTitle>
+                      <DialogDescription>
+                        Select report type and filter options.
+                      </DialogDescription>
+                    </DialogHeader>
+                    <div className="mb-4">
+                      <Label>Report Type</Label>
+                      <div className="flex gap-4 mt-2">
+                        <Button variant={attendanceReportType === "platoon" ? "default" : "outline"} onClick={() => setAttendanceReportType("platoon")}>Platoon</Button>
+                        <Button variant={attendanceReportType === "cadet" ? "default" : "outline"} onClick={() => setAttendanceReportType("cadet")}>Cadet</Button>
+                      </div>
+                    </div>
+                    {attendanceReportType === "platoon" && (
+                      <div className="mb-4">
+                        <Label>Select Platoon</Label>
+                        <select className="w-full mt-2 p-2 border rounded" value={attendanceReportPlatoon} onChange={e => setAttendanceReportPlatoon(e.target.value)}>
+                          <option value="">-- Select Platoon --</option>
+                          <option value="Junior">Junior</option>
+                          <option value="Senior">Senior</option>
+                        </select>
+                      </div>
+                    )}
+                    {attendanceReportType === "cadet" && (
+                      <div className="mb-4">
+                        <Label>Select Cadet</Label>
+                        <select className="w-full mt-2 p-2 border rounded" value={attendanceReportCadet} onChange={e => setAttendanceReportCadet(e.target.value)}>
+                          <option value="">-- Select Cadet --</option>
+                          {cadets.map(cadet => (
+                            <option key={cadet.id} value={cadet.id}>{cadet.name_full}</option>
+                          ))}
+                        </select>
+                      </div>
+                    )}
+                    <div className="grid grid-cols-2 gap-4 mb-4">
+                      <div>
+                        <Label>From Date</Label>
+                        <Input type="date" value={attendanceReportFrom} onChange={e => setAttendanceReportFrom(e.target.value)} />
+                      </div>
+                      <div>
+                        <Label>To Date</Label>
+                        <Input type="date" value={attendanceReportTo} onChange={e => setAttendanceReportTo(e.target.value)} />
+                      </div>
+                    </div>
+                    <div className="flex justify-end gap-2">
+                      <Button variant="outline" onClick={() => setIsAttendanceReportDialogOpen(false)}>Cancel</Button>
+                      <Button
+                        onClick={handleDownloadAttendanceReport}
+                        disabled={attendanceReportType === "platoon" ? !attendanceReportPlatoon : !attendanceReportCadet}
+                      >Download</Button>
+                    </div>
+                  </DialogContent>
+                </Dialog>
+              </TabsContent>
+              {/* Excuse Letters Tab Content */}
+              <TabsContent value="excuse_letters" className="space-y-6 mt-6">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Date</TableHead>
+                      <TableHead>Number of Days</TableHead>
+                      <TableHead>Reason</TableHead>
+                      <TableHead>Approval</TableHead>
+                      <TableHead>Eligibility</TableHead>
+                      <TableHead>Actions</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {(excuseLetters || []).map((record) => (
+                      <TableRow key={record.id}>
+                        <TableCell>{record.absent_dates}</TableCell>
+                        <TableCell>{record.number_of_days}</TableCell>
+                        <TableCell>{record.reason}</TableCell>
+                        <TableCell>{record.approval_status ? 'Approved' : 'Pending'}</TableCell>
+                        <TableCell>{record.eligibility ? 'Yes' : 'No'}</TableCell>
+                        <TableCell>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => deleteRecord('excuse_letters', record.id)}
+                            className="text-destructive"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </TabsContent>
             </Tabs>
           </CardContent>
         </Card>
       )}
     </div>
   );
-};
-
+}
 export default CadetManagement;

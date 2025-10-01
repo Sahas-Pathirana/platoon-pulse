@@ -1,3 +1,4 @@
+// ...existing code...
 import { useState, useEffect } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -15,6 +16,8 @@ import {
   CheckCircle, AlertCircle, XCircle, Timer
 } from "lucide-react";
 import { format } from "date-fns";
+import jsPDF from "jspdf";
+import autoTable from "jspdf-autotable";
 
 interface PracticeSession {
   id: string;
@@ -40,6 +43,42 @@ interface AttendanceRecord {
 }
 
 const AttendanceManagement = () => {
+  // Delete practice session
+  const handleDeleteSession = async (sessionId: string) => {
+    if (!confirm("Are you sure you want to delete this practice session? This action cannot be undone.")) {
+      return;
+    }
+    setIsLoading(true);
+    try {
+      const { error } = await supabase
+        .from('practice_sessions')
+        .delete()
+        .eq('id', sessionId);
+      if (error) throw error;
+      toast({
+        title: "Success",
+        description: "Practice session deleted successfully",
+      });
+      fetchPracticeSessions();
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to delete practice session",
+        variant: "destructive",
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+  const [isDownloadDialogOpen, setIsDownloadDialogOpen] = useState(false);
+  const [downloadType, setDownloadType] = useState("");
+  const [selectedPlatoon, setSelectedPlatoon] = useState("");
+  const [selectedCadet, setSelectedCadet] = useState("");
+  const [cadetSearch, setCadetSearch] = useState("");
+  const [filterFrom, setFilterFrom] = useState("");
+  const [filterTo, setFilterTo] = useState("");
+  const [filterPlatoon, setFilterPlatoon] = useState("");
+  const [filterCadet, setFilterCadet] = useState("");
   const { toast } = useToast();
   const { user } = useAuth();
   const [isLoading, setIsLoading] = useState(false);
@@ -149,10 +188,41 @@ const AttendanceManagement = () => {
         .rpc('get_attendance_report', { session_id: sessionId });
 
       if (error) throw error;
-      setAttendanceRecords((data || []).map(record => ({
-        ...record,
-        id: record.id || `${record.cadet_name}-${sessionId}`,
-      })));
+      // Find the session duration from selectedSession or sessions list
+      let sessionDuration = selectedSession?.duration_minutes;
+      if (!sessionDuration || sessionDuration <= 0) {
+        const sessionObj = sessions.find(s => s.id === sessionId);
+        sessionDuration = sessionObj?.duration_minutes || 0;
+      }
+      setAttendanceRecords((data || []).map(record => {
+        let participation_minutes = 0;
+        if (record.entry_time && record.exit_time) {
+          const [eh, em] = record.exit_time.split(":").map(Number);
+          const [sh, sm] = record.entry_time.split(":").map(Number);
+          participation_minutes = (eh * 60 + em) - (sh * 60 + sm);
+          if (participation_minutes < 0) participation_minutes = 0;
+        }
+        let attendance_percentage = 0;
+        if (sessionDuration > 0) {
+          attendance_percentage = (participation_minutes / sessionDuration) * 100;
+          if (attendance_percentage < 0) attendance_percentage = 0;
+          if (attendance_percentage > 100) attendance_percentage = 100;
+        }
+        // Set attendance status based on percentage
+        let attendance_status = "absent";
+        if (attendance_percentage >= 80) {
+          attendance_status = "present";
+        } else if (attendance_percentage >= 20) {
+          attendance_status = "leave_early";
+        }
+        return {
+          ...record,
+          participation_minutes,
+          attendance_percentage,
+          attendance_status,
+          id: record.id || `${record.cadet_name}-${sessionId}`,
+        };
+      }));
     } catch (error: any) {
       toast({
         title: "Error",
@@ -167,58 +237,50 @@ const AttendanceManagement = () => {
   const generateAttendanceReport = async (session: PracticeSession) => {
     try {
       await fetchAttendanceReport(session.id);
-      
-      const reportData = `Attendance Report - ${session.title}\n`;
-      const reportHeader = `Date: ${format(new Date(session.practice_date), 'PPP')}\n`;
-      const reportTime = `Time: ${session.start_time} - ${session.end_time} (${session.duration_minutes} minutes)\n\n`;
-      
-      const presentCadets = attendanceRecords.filter(r => r.attendance_status === 'present');
-      const leaveEarlyCadets = attendanceRecords.filter(r => r.attendance_status === 'leave_early');
-      const absentCadets = attendanceRecords.filter(r => r.attendance_status === 'absent');
-      
-      let reportContent = reportData + reportHeader + reportTime;
-      
-      reportContent += `SUMMARY:\n`;
-      reportContent += `Present: ${presentCadets.length}\n`;
-      reportContent += `Left Early: ${leaveEarlyCadets.length}\n`;
-      reportContent += `Absent: ${absentCadets.length}\n`;
-      reportContent += `Total Cadets: ${attendanceRecords.length}\n\n`;
-      
-      reportContent += `PRESENT CADETS (80%+ attendance):\n`;
-      reportContent += `${'Name'.padEnd(30)} ${'App No'.padEnd(10)} ${'Platoon'.padEnd(10)} ${'Entry'.padEnd(8)} ${'Exit'.padEnd(8)} ${'%'.padEnd(6)}\n`;
-      reportContent += '-'.repeat(80) + '\n';
-      presentCadets.forEach(cadet => {
-        reportContent += `${cadet.cadet_name.padEnd(30)} ${cadet.application_number.padEnd(10)} ${(cadet.platoon || '').padEnd(10)} ${(cadet.entry_time || '').padEnd(8)} ${(cadet.exit_time || '').padEnd(8)} ${cadet.attendance_percentage.toFixed(1).padEnd(6)}\n`;
-      });
-      
-      reportContent += `\nLEFT EARLY (20-80% attendance):\n`;
-      reportContent += `${'Name'.padEnd(30)} ${'App No'.padEnd(10)} ${'Platoon'.padEnd(10)} ${'Entry'.padEnd(8)} ${'Exit'.padEnd(8)} ${'%'.padEnd(6)}\n`;
-      reportContent += '-'.repeat(80) + '\n';
-      leaveEarlyCadets.forEach(cadet => {
-        reportContent += `${cadet.cadet_name.padEnd(30)} ${cadet.application_number.padEnd(10)} ${(cadet.platoon || '').padEnd(10)} ${(cadet.entry_time || '').padEnd(8)} ${(cadet.exit_time || '').padEnd(8)} ${cadet.attendance_percentage.toFixed(1).padEnd(6)}\n`;
-      });
-      
-      reportContent += `\nABSENT (<20% attendance):\n`;
-      reportContent += `${'Name'.padEnd(30)} ${'App No'.padEnd(10)} ${'Platoon'.padEnd(10)} ${'Entry'.padEnd(8)} ${'Exit'.padEnd(8)} ${'%'.padEnd(6)}\n`;
-      reportContent += '-'.repeat(80) + '\n';
-      absentCadets.forEach(cadet => {
-        reportContent += `${cadet.cadet_name.padEnd(30)} ${cadet.application_number.padEnd(10)} ${(cadet.platoon || '').padEnd(10)} ${(cadet.entry_time || '').padEnd(8)} ${(cadet.exit_time || '').padEnd(8)} ${cadet.attendance_percentage.toFixed(1).padEnd(6)}\n`;
-      });
+      // Filter records
+      let filteredRecords = attendanceRecords;
+      if (filterFrom && filterTo) {
+        filteredRecords = filteredRecords.filter(r => {
+          const date = new Date(session.practice_date);
+          return date >= new Date(filterFrom) && date <= new Date(filterTo);
+        });
+      }
+      if (filterPlatoon) {
+        filteredRecords = filteredRecords.filter(r => r.platoon === filterPlatoon);
+      }
+      if (filterCadet) {
+        filteredRecords = filteredRecords.filter(r => r.cadet_name.toLowerCase().includes(filterCadet.toLowerCase()));
+      }
 
-      // Download the report
-      const blob = new Blob([reportContent], { type: 'text/plain' });
-      const url = window.URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `attendance-report-${session.practice_date}-${session.title.replace(/\s+/g, '-')}.txt`;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      window.URL.revokeObjectURL(url);
+      // Count number of days practices held
+      const daysHeld = sessions.length;
+
+      // Prepare table data
+      const tableData = filteredRecords.map((r, idx) => [
+        r.application_number,
+        r.cadet_name,
+        r.platoon,
+        r.participation_minutes,
+        r.attendance_percentage.toFixed(1) + "%",
+        r.attendance_status,
+        r.attendance_status === "present" ? "Yes" : "No"
+      ]);
+
+      // PDF generation
+      const doc = new jsPDF();
+      doc.text(`Attendance Report - ${session.title}`, 10, 10);
+      doc.text(`Date: ${format(new Date(session.practice_date), 'PPP')}`, 10, 18);
+      doc.text(`Practice Days Held: ${daysHeld}`, 10, 26);
+      autoTable(doc, {
+        head: [["Regiment No.", "Name", "Platoon", "Duration (min)", "Attendance %", "Status", "Eligible"]],
+        body: tableData,
+        startY: 32
+      });
+      doc.save(`attendance-report-${session.practice_date}-${session.title.replace(/\s+/g, '-')}.pdf`);
 
       toast({
         title: "Success",
-        description: "Attendance report downloaded successfully",
+        description: "Attendance report downloaded as PDF",
       });
     } catch (error: any) {
       toast({
@@ -256,39 +318,110 @@ const AttendanceManagement = () => {
   };
 
   return (
-    <div className="space-y-6">
-      {/* Practice Sessions Management */}
-      <Card>
-        <CardHeader>
-          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-            <div>
-              <CardTitle className="flex items-center gap-2">
-                <Calendar className="h-5 w-5" />
-                Practice Sessions
-              </CardTitle>
-              <CardDescription>
-                Create and manage practice schedules for attendance tracking
-              </CardDescription>
+  <div className="space-y-6">
+      <div className="space-y-6">
+        {/* Download Report Dialog */}
+        <Dialog open={isDownloadDialogOpen} onOpenChange={setIsDownloadDialogOpen}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Download Attendance Report</DialogTitle>
+              <DialogDescription>
+                Select report type and filter options.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="mb-4">
+              <Label>Report Type</Label>
+              <div className="flex gap-4 mt-2">
+                <Button variant={downloadType === "platoon" ? "default" : "outline"} onClick={() => setDownloadType("platoon")}>Platoon</Button>
+                <Button variant={downloadType === "cadet" ? "default" : "outline"} onClick={() => setDownloadType("cadet")}>Cadet</Button>
+              </div>
             </div>
-            <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
-              <DialogTrigger asChild>
-                <Button className="flex items-center gap-2">
-                  <Plus className="h-4 w-4" />
-                  Create Practice Session
-                </Button>
-              </DialogTrigger>
-              <DialogContent className="max-w-2xl">
-                <DialogHeader>
-                  <DialogTitle>Create New Practice Session</DialogTitle>
-                  <DialogDescription>
-                    Set up a new practice session for attendance tracking
-                  </DialogDescription>
-                </DialogHeader>
-                <div className="grid grid-cols-1 gap-4 py-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="title">Practice Title *</Label>
-                    <Input
-                      id="title"
+            {downloadType === "platoon" && (
+              <div className="mb-4">
+                <Label>Select Platoon</Label>
+                <select className="w-full mt-2 p-2 border rounded" value={selectedPlatoon} onChange={e => setSelectedPlatoon(e.target.value)}>
+                  <option value="">-- Select Platoon --</option>
+                  {[...new Set(attendanceRecords.map(r => r.platoon).filter(Boolean))].map(platoon => (
+                    <option key={platoon} value={platoon}>{platoon}</option>
+                  ))}
+                </select>
+              </div>
+            )}
+            {downloadType === "cadet" && (
+              <div className="mb-4">
+                <Label>Select Cadet</Label>
+                <select className="w-full mt-2 p-2 border rounded" value={selectedCadet} onChange={e => setSelectedCadet(e.target.value)}>
+                  <option value="">-- Select Cadet --</option>
+                  {[...new Set(attendanceRecords.map(r => r.cadet_name).filter(Boolean))].map(name => (
+                    <option key={name} value={name}>{name}</option>
+                  ))}
+                </select>
+              </div>
+            )}
+            <div className="flex justify-end gap-2">
+              <Button variant="outline" onClick={() => setIsDownloadDialogOpen(false)}>Cancel</Button>
+              <Button
+                onClick={() => {
+                  setIsDownloadDialogOpen(false);
+                  if (downloadType === "platoon" && selectedPlatoon) {
+                    setFilterPlatoon(selectedPlatoon);
+                    setFilterCadet("");
+                    generateAttendanceReport(selectedSession!);
+                  } else if (downloadType === "cadet" && selectedCadet) {
+                    setFilterCadet(selectedCadet);
+                    setFilterPlatoon("");
+                    generateAttendanceReport(selectedSession!);
+                  }
+                }}
+                disabled={downloadType === "platoon" ? !selectedPlatoon : !selectedCadet}
+              >Download</Button>
+            </div>
+          </DialogContent>
+        </Dialog>
+        {/* ...existing code... */}
+        <div className="mb-8">
+          <h3 className="text-lg font-semibold mb-4">Practice Sessions</h3>
+          <div className="space-y-2">
+            {sessions.map(session => (
+              <Card key={session.id} className="border p-4 flex flex-col sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                  <div className="font-semibold">{session.title}</div>
+                  <div className="text-sm text-muted-foreground">{format(new Date(session.practice_date), 'PPP')} • {session.start_time} - {session.end_time}</div>
+                </div>
+                <div className="flex gap-2 mt-2 sm:mt-0">
+                  <Button size="sm" variant="outline" onClick={() => setSelectedSession(session)}>
+                    View Attendance
+                  </Button>
+                  <Button size="sm" variant="destructive" onClick={() => handleDeleteSession(session.id)} disabled={isLoading}>
+                    Delete
+                  </Button>
+                </div>
+              </Card>
+            ))}
+          </div>
+  {/* End Practice Sessions Grid */}
+        {/* ...existing code... */}
+      </div>
+      {/* Create Practice Session Dialog */}
+      <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
+        <DialogTrigger asChild>
+          <Button variant="default" onClick={() => setIsCreateDialogOpen(true)}>
+            <Plus className="h-4 w-4" />
+            Create Practice Session
+          </Button>
+        </DialogTrigger>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Create New Practice Session</DialogTitle>
+            <DialogDescription>
+              Set up a new practice session for attendance tracking
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid grid-cols-1 gap-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="title">Practice Title *</Label>
+              <Input
+                id="title"
                       value={newSession.title}
                       onChange={(e) => setNewSession({ ...newSession, title: e.target.value })}
                       placeholder="Weekly Drill Practice"
@@ -345,61 +478,55 @@ const AttendanceManagement = () => {
               </DialogContent>
             </Dialog>
           </div>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-4">
-            {sessions.length === 0 ? (
-              <div className="text-center py-8 text-muted-foreground">
-                No practice sessions created yet. Create your first session to start tracking attendance.
-              </div>
-            ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                {sessions.map((session) => (
-                  <Card 
-                    key={session.id} 
-                    className={`cursor-pointer transition-colors hover:bg-muted ${
-                      selectedSession?.id === session.id ? 'ring-2 ring-primary' : ''
-                    }`}
-                    onClick={() => {
-                      setSelectedSession(session);
-                      fetchAttendanceReport(session.id);
-                    }}
-                  >
-                    <CardContent className="p-4">
-                      <div className="space-y-2">
-                        <h4 className="font-semibold">{session.title}</h4>
-                        <div className="text-sm text-muted-foreground space-y-1">
-                          <div className="flex items-center gap-2">
-                            <Calendar className="h-3 w-3" />
-                            {format(new Date(session.practice_date), 'PPP')}
-                          </div>
-                          <div className="flex items-center gap-2">
-                            <Clock className="h-3 w-3" />
-                            {session.start_time} - {session.end_time}
-                          </div>
-                          <div className="flex items-center gap-2">
-                            <Timer className="h-3 w-3" />
-                            {session.duration_minutes} minutes
-                          </div>
+        {/* Practice Sessions Grid */}
+          {sessions.length === 0 ? (
+            <div className="text-center py-8 text-muted-foreground">
+              No practice sessions created yet. Create your first session to start tracking attendance.
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {sessions.map((session) => (
+                <Card 
+                  key={session.id} 
+                  className={`cursor-pointer transition-colors hover:bg-muted ${
+                    selectedSession?.id === session.id ? 'ring-2 ring-primary' : ''
+                  }`}
+                  onClick={() => {
+                    setSelectedSession(session);
+                    fetchAttendanceReport(session.id);
+                  }}
+                >
+                  <CardContent className="p-4">
+                    <div className="space-y-2">
+                      <h4 className="font-semibold">{session.title}</h4>
+                      <div className="text-sm text-muted-foreground space-y-1">
+                        <div className="flex items-center gap-2">
+                          <Calendar className="h-3 w-3" />
+                          {format(new Date(session.practice_date), 'PPP')}
                         </div>
-                        {session.description && (
-                          <p className="text-xs text-muted-foreground line-clamp-2">
-                            {session.description}
-                          </p>
-                        )}
+                        <div className="flex items-center gap-2">
+                          <Clock className="h-3 w-3" />
+                          {session.start_time} - {session.end_time}
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <Timer className="h-3 w-3" />
+                          {session.duration_minutes} minutes
+                        </div>
                       </div>
-                    </CardContent>
-                  </Card>
-                ))}
-              </div>
-            )}
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Attendance Report */}
-      {selectedSession && (
-        <Card>
+                      {session.description && (
+                        <p className="text-xs text-muted-foreground line-clamp-2">
+                          {session.description}
+                        </p>
+                      )}
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          )}
+        {/* Attendance Report */}
+        {selectedSession && (
+          <Card>
           <CardHeader>
             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
               <div>
@@ -414,7 +541,7 @@ const AttendanceManagement = () => {
                 </CardDescription>
               </div>
               <Button 
-                onClick={() => generateAttendanceReport(selectedSession)}
+                onClick={() => setIsDownloadDialogOpen(true)}
                 className="flex items-center gap-2"
                 disabled={isLoading}
               >
@@ -445,7 +572,6 @@ const AttendanceManagement = () => {
                       <p className="text-xs text-muted-foreground">80%+ attendance</p>
                     </CardContent>
                   </Card>
-                  
                   <Card>
                     <CardContent className="p-4 text-center">
                       <div className="flex items-center justify-center gap-2 mb-2">
@@ -458,7 +584,6 @@ const AttendanceManagement = () => {
                       <p className="text-xs text-muted-foreground">20-80% attendance</p>
                     </CardContent>
                   </Card>
-                  
                   <Card>
                     <CardContent className="p-4 text-center">
                       <div className="flex items-center justify-center gap-2 mb-2">
@@ -471,7 +596,6 @@ const AttendanceManagement = () => {
                       <p className="text-xs text-muted-foreground">&lt;20% attendance</p>
                     </CardContent>
                   </Card>
-                  
                   <Card>
                     <CardContent className="p-4 text-center">
                       <div className="flex items-center justify-center gap-2 mb-2">
@@ -485,7 +609,6 @@ const AttendanceManagement = () => {
                     </CardContent>
                   </Card>
                 </div>
-
                 {/* Detailed Attendance Table */}
                 <div className="border rounded-lg overflow-hidden">
                   <Table>
@@ -514,13 +637,8 @@ const AttendanceManagement = () => {
                           <TableCell>{record.entry_time || '-'}</TableCell>
                           <TableCell>{record.exit_time || '-'}</TableCell>
                           <TableCell>{record.participation_minutes || 0} min</TableCell>
-                          <TableCell>{record.attendance_percentage?.toFixed(1) || '0.0'}%</TableCell>
-                          <TableCell>
-                            <div className="flex items-center gap-2">
-                              {getStatusIcon(record.attendance_status)}
-                              {getStatusBadge(record.attendance_status)}
-                            </div>
-                          </TableCell>
+                          <TableCell>{record.attendance_percentage.toFixed(1)}%</TableCell>
+                          <TableCell>{getStatusBadge(record.attendance_status)}</TableCell>
                         </TableRow>
                       ))}
                     </TableBody>
@@ -531,8 +649,9 @@ const AttendanceManagement = () => {
           </CardContent>
         </Card>
       )}
-    </div>
-  );
+    {/* ...existing code... */}
+  </div>
+);
 };
 
 export default AttendanceManagement;

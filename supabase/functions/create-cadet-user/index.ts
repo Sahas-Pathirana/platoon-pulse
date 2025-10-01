@@ -1,4 +1,6 @@
-import { createClient } from 'npm:@supabase/supabase-js@2'
+/// <reference types="https://deno.land/std@0.203.0/types.d.ts" />
+// @deno-types="https://esm.sh/v135/@supabase/supabase-js@2/dist/module/index.d.ts"
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -13,7 +15,8 @@ interface CreateCadetUserRequest {
   cadetId: string
 }
 
-Deno.serve(async (req) => {
+// Explicitly type the handler for Deno.serve
+Deno.serve(async (req: Request): Promise<Response> => {
   // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders })
@@ -221,10 +224,10 @@ Deno.serve(async (req) => {
       )
     }
 
-    // Upsert the user profile linking to the cadet (idempotent)
+    // Create the user profile linking to the cadet
     const { error: profileError } = await supabaseAdmin
       .from('user_profiles')
-      .upsert(
+     .upsert(
         {
           id: authData.user.id,
           email: email.trim(),

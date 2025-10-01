@@ -1,3 +1,15 @@
+
+// Validate profile photo (size and type)
+const validateProfilePhoto = (file: File): string | null => {
+  const maxSize = 5 * 1024 * 1024; // 5MB
+  if (file.size > maxSize) {
+    return "Profile photo size must be less than 5MB";
+  }
+  if (!file.type.startsWith('image/')) {
+    return "Profile photo must be an image file";
+  }
+  return null;
+};
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -20,37 +32,28 @@ interface CadetRegistrationData {
   applicationNumber: string;
   dateOfBirth: string;
   age: string;
-  
+  profilePhoto: File | null;
   // Physical & Personal Details
   schoolAdmissionNo: string;
   regimentNo: string;
   rank: string;
-  platoon: string;
   dateOfEnrollment: string;
   birthCertificateNo: string;
   nationalId: string;
   bloodGroup: string;
   heightCm: string;
   chestCm: string;
-  photographUrl: string;
   skillsTalents: string;
-  
   // Addresses
   permanentAddress: string;
   postalAddress: string;
-  
   // Practice & Withdrawal Information
   dateJoinedPractices: string;
   dateLeftPractices: string;
   withdrawalLetterType: string;
-  withdrawalDateFrom: string;
-  withdrawalDateTo: string;
-  withdrawalReason: string;
   withdrawalApproved: boolean;
   battalionInformed: boolean;
   battalionAcceptance: boolean;
-  battalionAcceptanceDate: string;
-  
   // Family Contacts
   fatherName: string;
   fatherOccupation: string;
@@ -62,16 +65,11 @@ interface CadetRegistrationData {
   motherWhatsapp: string;
   guardianName: string;
   guardianContact: string;
-  
   // Medical Information
   medicalCertificateUrl: string;
   medicalIssuanceParty: string;
   medicalDateOfIssue: string;
   medicalValidityEndDate: string;
-  
-  // Administrative
-  masterRemarks: string;
-  rectorRecommendations: string;
 }
 
 interface CadetRegistrationFormProps {
@@ -97,15 +95,15 @@ export const CadetRegistrationForm = ({ onSuccess }: CadetRegistrationFormProps)
     schoolAdmissionNo: '',
     regimentNo: '',
     rank: 'Cadet',
-    platoon: 'Junior',
     dateOfEnrollment: '',
     birthCertificateNo: '',
     nationalId: '',
     bloodGroup: '',
     heightCm: '',
     chestCm: '',
-    photographUrl: '',
+  // photographUrl removed
     skillsTalents: '',
+    profilePhoto: null as File | null,
     
     // Addresses
     permanentAddress: '',
@@ -115,13 +113,11 @@ export const CadetRegistrationForm = ({ onSuccess }: CadetRegistrationFormProps)
     dateJoinedPractices: '',
     dateLeftPractices: '',
     withdrawalLetterType: '',
-    withdrawalDateFrom: '',
-    withdrawalDateTo: '',
-    withdrawalReason: '',
+  // withdrawalDateFrom, withdrawalDateTo, withdrawalReason removed
     withdrawalApproved: false,
     battalionInformed: false,
     battalionAcceptance: false,
-    battalionAcceptanceDate: '',
+  // battalionAcceptanceDate removed
     
     // Family Contacts
     fatherName: '',
@@ -142,8 +138,7 @@ export const CadetRegistrationForm = ({ onSuccess }: CadetRegistrationFormProps)
     medicalValidityEndDate: '',
     
     // Administrative
-    masterRemarks: '',
-    rectorRecommendations: '',
+  // masterRemarks, rectorRecommendations removed
   });
 
   const updateFormData = (field: keyof CadetRegistrationData, value: string | boolean) => {
@@ -164,42 +159,78 @@ export const CadetRegistrationForm = ({ onSuccess }: CadetRegistrationFormProps)
     return age.toString();
   };
 
+  const handleProfilePhotoChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      if (file.size > 5 * 1024 * 1024) { // 5MB in bytes
+        toast({
+          title: "Error",
+          description: "Profile photo must be less than 5MB",
+          variant: "destructive",
+        });
+        e.target.value = '';
+        return;
+      }
+      setFormData(prev => ({ ...prev, profilePhoto: file }));
+    }
+  };
+
+  // Upload profile photo to Supabase Storage and return public URL
+  const uploadProfilePhoto = async (): Promise<string | null> => {
+    const file = formData.profilePhoto;
+    if (!file) return null;
+    try {
+      const fileExt = file.name.split('.').pop();
+      const fileName = `profile_${Date.now()}.${fileExt}`;
+      const { error } = await supabase.storage
+        .from('profile-photos')
+        .upload(fileName, file, { upsert: true });
+      if (error) throw error;
+      const { data: { publicUrl } } = supabase.storage
+        .from('profile-photos')
+        .getPublicUrl(fileName);
+      return publicUrl;
+    } catch (error) {
+      toast({ title: 'Error', description: 'Failed to upload profile photo', variant: 'destructive' });
+      return null;
+    }
+  };
+
   const handleDateOfBirthChange = (dateOfBirth: string) => {
     updateFormData('dateOfBirth', dateOfBirth);
     const calculatedAge = calculateAge(dateOfBirth);
     updateFormData('age', calculatedAge);
-    
-    // Automatically select platoon based on age
-    const ageNum = parseInt(calculatedAge);
-    if (ageNum >= 14) {
-      updateFormData('platoon', 'Senior');
-    } else if (ageNum >= 12) {
-      updateFormData('platoon', 'Junior');
-    }
   };
 
   const validateRegimentNumber = (regimentNo: string): boolean => {
-    // Format: XX/XX/X/XXX (2 digits, 2 digits, 1 digit, 3 digits)
-    const regimentPattern = /^\d{2}\/\d{2}\/\d{1}\/\d{3}$/;
-    return regimentPattern.test(regimentNo);
+  // Format: XX/XX/X/XXX (letters or digits in each segment)
+  const regimentPattern = /^[A-Z0-9]{2}\/[A-Z0-9]{2}\/[A-Z0-9]{1}\/[A-Z0-9]{3}$/i;
+  return regimentPattern.test(regimentNo);
   };
 
   const formatRegimentNumber = (value: string): string => {
-    // Remove all non-digits
-    const digits = value.replace(/\D/g, '');
-    
-    // Apply formatting: XX/XX/X/XXX
-    let formatted = '';
-    if (digits.length > 0) formatted += digits.substring(0, 2);
-    if (digits.length > 2) formatted += '/' + digits.substring(2, 4);
-    if (digits.length > 4) formatted += '/' + digits.substring(4, 5);
-    if (digits.length > 5) formatted += '/' + digits.substring(5, 8);
-    
-    return formatted;
+  // Remove all non-alphanumeric characters
+  const chars = value.replace(/[^a-zA-Z0-9]/g, '');
+
+  // Apply formatting: XX/XX/X/XXX (letters or digits)
+  let formatted = '';
+  if (chars.length > 0) formatted += chars.substring(0, 2);
+  if (chars.length > 2) formatted += '/' + chars.substring(2, 4);
+  if (chars.length > 4) formatted += '/' + chars.substring(4, 5);
+  if (chars.length > 5) formatted += '/' + chars.substring(5, 8);
+
+  return formatted;
   };
+
 
   const validateForm = (): string[] => {
     const errors: string[] = [];
+    
+    // Profile photo validation
+    if (formData.profilePhoto) {
+      const photoError = validateProfilePhoto(formData.profilePhoto);
+      if (photoError) errors.push(photoError);
+    }
     
     // Required fields validation
     if (!formData.fullName) errors.push("Full Name is required");
@@ -211,15 +242,6 @@ export const CadetRegistrationForm = ({ onSuccess }: CadetRegistrationFormProps)
     // Regiment number validation
     if (formData.regimentNo && !validateRegimentNumber(formData.regimentNo)) {
       errors.push("Regiment Number must be in format XX/XX/X/XXX (e.g., 12/34/5/678)");
-    }
-    
-    // Age validation for platoon
-    const age = parseInt(formData.age);
-    if (formData.platoon === 'Junior' && (age < 12 || age >= 14)) {
-      errors.push("Junior Platoon requires age between 12-14 years");
-    }
-    if (formData.platoon === 'Senior' && (age < 14 || age >= 20)) {
-      errors.push("Senior Platoon requires age between 14-20 years");
     }
     
     // Physical requirements
@@ -252,9 +274,15 @@ export const CadetRegistrationForm = ({ onSuccess }: CadetRegistrationFormProps)
     setIsLoading(true);
 
     try {
-      // Create cadet record
+      // Upload profile photo first (if any)
+      let photoUrl: string | null = null;
+      if (formData.profilePhoto) {
+        photoUrl = await uploadProfilePhoto();
+      }
+
+      // Insert into pending_cadets for admin approval
       const { data: cadetData, error: cadetError } = await supabase
-        .from('cadets')
+        .from('pending_cadets')
         .insert({
           name_full: formData.fullName,
           name_with_initials: formData.nameWithInitials || formData.fullName,
@@ -264,29 +292,23 @@ export const CadetRegistrationForm = ({ onSuccess }: CadetRegistrationFormProps)
           school_admission_no: formData.schoolAdmissionNo || null,
           regiment_no: formData.regimentNo || null,
           rank: formData.rank,
-          platoon: formData.platoon,
           date_of_enrollment: formData.dateOfEnrollment || null,
           birth_certificate_no: formData.birthCertificateNo || null,
           national_id: formData.nationalId || null,
           blood_group: formData.bloodGroup || null,
           height_cm: parseInt(formData.heightCm) || null,
           chest_cm: parseInt(formData.chestCm) || null,
-          photograph_url: formData.photographUrl || null,
+          photograph_url: photoUrl,
           skills_talents: formData.skillsTalents || null,
           permanent_address: formData.permanentAddress || null,
           postal_address: formData.postalAddress || null,
           date_joined_practices: formData.dateJoinedPractices || null,
           date_left_practices: formData.dateLeftPractices || null,
           withdrawal_letter_type: formData.withdrawalLetterType || null,
-          withdrawal_date_from: formData.withdrawalDateFrom || null,
-          withdrawal_date_to: formData.withdrawalDateTo || null,
-          withdrawal_reason: formData.withdrawalReason || null,
           withdrawal_approved: formData.withdrawalApproved,
           battalion_informed: formData.battalionInformed,
           battalion_acceptance: formData.battalionAcceptance,
-          battalion_acceptance_date: formData.battalionAcceptanceDate || null,
-          master_remarks: formData.masterRemarks || null,
-          rector_recommendations: formData.rectorRecommendations || null,
+          email: formData.email,
         })
         .select()
         .single();
@@ -322,56 +344,9 @@ export const CadetRegistrationForm = ({ onSuccess }: CadetRegistrationFormProps)
       }
 
       // Create auth account
-      // Validate email before invoking edge function
-      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-      if (!emailRegex.test(formData.email)) {
-        toast({
-          title: "Invalid email",
-          description: "Please enter a valid email address to create the account.",
-          variant: "destructive",
-        });
-        return;
-      }
-
-      const { data: userData, error: userError } = await supabase.functions.invoke('create-cadet-user', {
-        body: {
-          email: formData.email.trim(),
-          password: formData.password,
-          fullName: formData.fullName,
-          cadetId: cadetData.id,
-        },
-      });
-
-      if (userError) {
-        // Cleanup created cadet records on failure (keep data consistent)
-        await supabase.from('medical_records').delete().eq('cadet_id', cadetData.id)
-        await supabase.from('family_contacts').delete().eq('cadet_id', cadetData.id)
-        await supabase.from('cadets').delete().eq('id', cadetData.id)
-
-        toast({
-          title: "Account creation failed",
-          description: userError.message || "Edge function error",
-          variant: "destructive",
-        });
-        return;
-      }
-      if (userData?.error) {
-        // Cleanup created cadet records on failure (keep data consistent)
-        await supabase.from('medical_records').delete().eq('cadet_id', cadetData.id)
-        await supabase.from('family_contacts').delete().eq('cadet_id', cadetData.id)
-        await supabase.from('cadets').delete().eq('id', cadetData.id)
-
-        toast({
-          title: "Account creation failed",
-          description: userData.error,
-          variant: "destructive",
-        });
-        return;
-      }
-
       toast({
         title: "Success",
-        description: `Cadet account created successfully for ${formData.fullName}`,
+        description: `Cadet registration submitted for admin approval.`,
       });
 
       // Reset form
@@ -386,27 +361,22 @@ export const CadetRegistrationForm = ({ onSuccess }: CadetRegistrationFormProps)
         schoolAdmissionNo: '',
         regimentNo: '',
         rank: 'Cadet',
-        platoon: 'Junior',
         dateOfEnrollment: '',
         birthCertificateNo: '',
         nationalId: '',
         bloodGroup: '',
+        profilePhoto: null,
         heightCm: '',
         chestCm: '',
-        photographUrl: '',
         skillsTalents: '',
         permanentAddress: '',
         postalAddress: '',
         dateJoinedPractices: '',
         dateLeftPractices: '',
         withdrawalLetterType: '',
-        withdrawalDateFrom: '',
-        withdrawalDateTo: '',
-        withdrawalReason: '',
         withdrawalApproved: false,
         battalionInformed: false,
         battalionAcceptance: false,
-        battalionAcceptanceDate: '',
         fatherName: '',
         fatherOccupation: '',
         fatherContact: '',
@@ -421,8 +391,6 @@ export const CadetRegistrationForm = ({ onSuccess }: CadetRegistrationFormProps)
         medicalIssuanceParty: '',
         medicalDateOfIssue: '',
         medicalValidityEndDate: '',
-        masterRemarks: '',
-        rectorRecommendations: '',
       });
       setActiveTab('basic');
       onSuccess();
@@ -480,6 +448,18 @@ export const CadetRegistrationForm = ({ onSuccess }: CadetRegistrationFormProps)
 
             {/* Basic Information Tab */}
             <TabsContent value="basic" className="space-y-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="profilePhoto">Profile Photo (Max 5MB)</Label>
+                  <Input
+                    id="profilePhoto"
+                    type="file"
+                    accept="image/*"
+                    onChange={handleProfilePhotoChange}
+                  />
+                </div>
+              </div>
+
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label htmlFor="fullName">Full Name *</Label>
@@ -556,28 +536,6 @@ export const CadetRegistrationForm = ({ onSuccess }: CadetRegistrationFormProps)
                     placeholder="Calculated from date of birth"
                     readOnly
                   />
-                </div>
-                
-                <div className="space-y-2">
-                  <Label htmlFor="platoon">Platoon *</Label>
-                  <Select 
-                    value={formData.platoon} 
-                    onValueChange={(value) => updateFormData('platoon', value)}
-                    disabled={!!formData.age}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder={formData.age ? "Auto-selected based on age" : "Select platoon"} />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="Junior">Junior Platoon (Ages 12-14)</SelectItem>
-                      <SelectItem value="Senior">Senior Platoon (Ages 14-20)</SelectItem>
-                    </SelectContent>
-                  </Select>
-                  {formData.age && (
-                    <p className="text-xs text-muted-foreground">
-                      Platoon automatically selected based on age ({formData.age} years)
-                    </p>
-                  )}
                 </div>
               </div>
             </TabsContent>
@@ -962,82 +920,7 @@ export const CadetRegistrationForm = ({ onSuccess }: CadetRegistrationFormProps)
             {/* Administrative Tab */}
             <TabsContent value="admin" className="space-y-6">
               <div className="grid grid-cols-1 gap-6">
-                <div className="space-y-2">
-                  <Label htmlFor="masterRemarks">Master's Remarks for Final Certificate</Label>
-                  <Textarea
-                    id="masterRemarks"
-                    value={formData.masterRemarks}
-                    onChange={(e) => updateFormData('masterRemarks', e.target.value)}
-                    placeholder="Master in charge remarks for the issuance of the final certificate"
-                    rows={4}
-                  />
-                </div>
-                
-                <div className="space-y-2">
-                  <Label htmlFor="rectorRecommendations">Rector's/Principal's Recommendations</Label>
-                  <Textarea
-                    id="rectorRecommendations"
-                    value={formData.rectorRecommendations}
-                    onChange={(e) => updateFormData('rectorRecommendations', e.target.value)}
-                    placeholder="Recommendations of the Rector/Principal to issue the final certificate"
-                    rows={4}
-                  />
-                </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="withdrawalReason">Withdrawal Reason</Label>
-                    <Textarea
-                      id="withdrawalReason"
-                      value={formData.withdrawalReason}
-                      onChange={(e) => updateFormData('withdrawalReason', e.target.value)}
-                      placeholder="Reason for withdrawal (if applicable)"
-                      rows={3}
-                    />
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label htmlFor="photographUrl">Photograph URL</Label>
-                    <Input
-                      id="photographUrl"
-                      value={formData.photographUrl}
-                      onChange={(e) => updateFormData('photographUrl', e.target.value)}
-                      placeholder="URL to cadet's photograph"
-                    />
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="withdrawalDateFrom">Withdrawal Date From</Label>
-                    <Input
-                      id="withdrawalDateFrom"
-                      type="date"
-                      value={formData.withdrawalDateFrom}
-                      onChange={(e) => updateFormData('withdrawalDateFrom', e.target.value)}
-                    />
-                  </div>
-                  
-                  <div className="space-y-2">
-                    <Label htmlFor="withdrawalDateTo">Withdrawal Date To</Label>
-                    <Input
-                      id="withdrawalDateTo"
-                      type="date"
-                      value={formData.withdrawalDateTo}
-                      onChange={(e) => updateFormData('withdrawalDateTo', e.target.value)}
-                    />
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label htmlFor="battalionAcceptanceDate">Battalion Acceptance Date</Label>
-                    <Input
-                      id="battalionAcceptanceDate"
-                      type="date"
-                      value={formData.battalionAcceptanceDate}
-                      onChange={(e) => updateFormData('battalionAcceptanceDate', e.target.value)}
-                    />
-                  </div>
-                </div>
 
                 <div className="pt-4 border-t">
                   <p className="text-sm text-muted-foreground mb-4">

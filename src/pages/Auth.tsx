@@ -6,20 +6,15 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useAuth } from "@/hooks/useAuth";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { CadetRegistrationForm } from "@/components/CadetRegistrationForm";
 
 const Auth = () => {
-  const { user, loading, signIn, signUp } = useAuth();
+  const { user, loading, signIn } = useAuth();
   const navigate = useNavigate();
   const [isLoading, setIsLoading] = useState(false);
   const [loginForm, setLoginForm] = useState({
     email: '',
     password: ''
-  });
-  const [signupForm, setSignupForm] = useState({
-    email: '',
-    password: '',
-    fullName: '',
-    regimentNumber: ''
   });
 
   // Redirect authenticated users - use Navigate component instead of useEffect
@@ -49,15 +44,6 @@ const Auth = () => {
     }
   };
 
-  const handleSignup = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setIsLoading(true);
-    
-    await signUp(signupForm.email, signupForm.password, signupForm.fullName, signupForm.regimentNumber);
-    
-    setIsLoading(false);
-  };
-
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
@@ -70,27 +56,28 @@ const Auth = () => {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-background">
-      <div className="w-full max-w-md p-6">
+    <div className="min-h-screen flex items-center justify-center bg-background p-4">
+      <div className="w-full max-w-6xl">
         <div className="text-center mb-8">
           <h1 className="text-3xl font-bold text-foreground">Cadet Management System</h1>
           <p className="text-muted-foreground mt-2">Access your cadet information</p>
         </div>
 
         <Tabs defaultValue="login" className="w-full">
-          <TabsList className="grid w-full grid-cols-2">
+          <TabsList className="grid w-full grid-cols-2 max-w-md mx-auto">
             <TabsTrigger value="login">Login</TabsTrigger>
             <TabsTrigger value="signup">Sign Up</TabsTrigger>
           </TabsList>
           
           <TabsContent value="login">
-            <Card>
-              <CardHeader>
-                <CardTitle>Login</CardTitle>
-                <CardDescription>
-                  Enter your credentials to access the system
-                </CardDescription>
-              </CardHeader>
+            <div className="flex justify-center">
+              <Card className="w-full max-w-md">
+                <CardHeader>
+                  <CardTitle>Login</CardTitle>
+                  <CardDescription>
+                    Enter your credentials to access the system
+                  </CardDescription>
+                </CardHeader>
               <CardContent>
                 <form onSubmit={handleLogin} className="space-y-4">
                   <div className="space-y-2">
@@ -120,67 +107,19 @@ const Auth = () => {
                 </form>
               </CardContent>
             </Card>
+            </div>
           </TabsContent>
           
           <TabsContent value="signup">
-            <Card>
-              <CardHeader>
-                <CardTitle>Sign Up</CardTitle>
-                <CardDescription>
-                  Create a new cadet account
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <form onSubmit={handleSignup} className="space-y-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="signup-name">Full Name</Label>
-                    <Input
-                      id="signup-name"
-                      type="text"
-                      placeholder="John Doe"
-                      value={signupForm.fullName}
-                      onChange={(e) => setSignupForm({ ...signupForm, fullName: e.target.value })}
-                      required
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="signup-email">Email</Label>
-                    <Input
-                      id="signup-email"
-                      type="email"
-                      placeholder="cadet@school.edu"
-                      value={signupForm.email}
-                      onChange={(e) => setSignupForm({ ...signupForm, email: e.target.value })}
-                      required
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="signup-password">Password</Label>
-                    <Input
-                      id="signup-password"
-                      type="password"
-                      value={signupForm.password}
-                      onChange={(e) => setSignupForm({ ...signupForm, password: e.target.value })}
-                      required
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="signup-regiment">Regiment Number</Label>
-                    <Input
-                      id="signup-regiment"
-                      type="text"
-                      placeholder="Enter your regiment number"
-                      value={signupForm.regimentNumber}
-                      onChange={(e) => setSignupForm({ ...signupForm, regimentNumber: e.target.value })}
-                      required
-                    />
-                  </div>
-                  <Button type="submit" className="w-full" disabled={isLoading}>
-                    {isLoading ? "Creating account..." : "Create Account"}
-                  </Button>
-                </form>
-              </CardContent>
-            </Card>
+            <div className="w-full max-w-4xl mx-auto">
+              <CadetRegistrationForm onSuccess={() => {
+                // After successful registration, switch to login tab
+                const loginTab = document.querySelector('[value="login"]') as HTMLElement;
+                if (loginTab) {
+                  loginTab.click();
+                }
+              }} />
+            </div>
           </TabsContent>
         </Tabs>
       </div>

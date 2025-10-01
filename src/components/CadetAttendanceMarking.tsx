@@ -32,14 +32,19 @@ interface MyAttendance {
   attendance_status: string;
   marked_at: string;
 }
-
-const CadetAttendanceMarking = () => {
+const CadetAttendanceMarking = ({ onAttendanceMarked }: { onAttendanceMarked?: () => void }) => {
   const { toast } = useToast();
   const { user } = useAuth();
   const [isLoading, setIsLoading] = useState(false);
   const [sessions, setSessions] = useState<PracticeSession[]>([]);
   const [myAttendance, setMyAttendance] = useState<Record<string, MyAttendance>>({});
   const [attendanceForm, setAttendanceForm] = useState<Record<string, { entry_time: string; exit_time: string }>>({});
+  const [cadetIdError, setCadetIdError] = useState<string | null>(null);
+
+  // Excuse letter state
+  const [excuseDialogSessionId, setExcuseDialogSessionId] = useState<string | null>(null);
+  const [excuseText, setExcuseText] = useState<string>('');
+  const [excuseSubmitting, setExcuseSubmitting] = useState(false);
 
   useEffect(() => {
     fetchPracticeSessions();
@@ -48,10 +53,10 @@ const CadetAttendanceMarking = () => {
 
   const fetchPracticeSessions = async () => {
     try {
+      // Fetch all sessions for the current term (remove date filter)
       const { data, error } = await supabase
         .from('practice_sessions')
         .select('*')
-        .gte('practice_date', new Date().toISOString().split('T')[0]) // Only future and today's sessions
         .order('practice_date', { ascending: true });
 
       if (error) throw error;
@@ -67,6 +72,16 @@ const CadetAttendanceMarking = () => {
 
   const fetchMyAttendance = async () => {
     try {
+      let cadetId = user?.cadet_id;
+      if (!cadetId) {
+        const { data: rpcCadetId } = await supabase.rpc('current_cadet_id');
+        cadetId = rpcCadetId as string;
+      }
+
+      if (!cadetId) {
+        throw new Error("Could not determine cadet ID");
+      }
+
       const { data, error } = await supabase
         .from('cadet_attendance')
         .select(`
@@ -78,14 +93,37 @@ const CadetAttendanceMarking = () => {
           attendance_percentage,
           attendance_status,
           marked_at
-        `);
+        `)
+        .eq('cadet_id', cadetId);
 
 
-      if (error) throw error;
-
+      if (error) {
+        setCadetIdError("Your cadet profile is not linked. Attendance marking is disabled. Please contact an administrator.");
+        setMyAttendance({});
+        return;
+      }
       const attendanceMap: Record<string, MyAttendance> = {};
       data?.forEach(record => {
-        attendanceMap[record.practice_session_id] = record;
+        let participation_minutes = 0;
+        let attendance_percentage = 0;
+        if (record.entry_time && record.exit_time) {
+          const [eh, em] = String(record.exit_time).split(":").map(Number);
+          const [sh, sm] = String(record.entry_time).split(":").map(Number);
+          participation_minutes = (eh * 60 + em) - (sh * 60 + sm);
+          if (participation_minutes < 0) participation_minutes = 0;
+          // Find the session duration
+          const session = sessions.find(s => s.id === record.practice_session_id);
+          if (session && session.duration_minutes > 0) {
+            attendance_percentage = (participation_minutes / session.duration_minutes) * 100;
+            if (attendance_percentage < 0) attendance_percentage = 0;
+            if (attendance_percentage > 100) attendance_percentage = 100;
+          }
+        }
+        attendanceMap[record.practice_session_id] = {
+          ...record,
+          participation_minutes,
+          attendance_percentage,
+        };
       });
       setMyAttendance(attendanceMap);
     } catch (error: any) {
@@ -106,47 +144,56 @@ const CadetAttendanceMarking = () => {
 
     setIsLoading(true);
     try {
-      const existingAttendance = myAttendance[sessionId];
-      
-      if (existingAttendance) {
-        // Update existing record
-        const updateData = type === 'entry' 
-          ? { entry_time: currentTime }
-          : { exit_time: currentTime };
-
-        const { error } = await supabase
-          .from('cadet_attendance')
-          .update(updateData)
-          .eq('id', existingAttendance.id);
-
-        if (error) throw error;
-      } else {
-        // Create new record
-        let cadetId = user?.cadet_id;
-        if (!cadetId) {
-          const { data: rpcCadetId } = await supabase.rpc('current_cadet_id');
-          cadetId = (rpcCadetId as string | null | undefined) || undefined;
-        }
-
-        const baseData = {
-          practice_session_id: sessionId,
-          ...(type === 'entry' ? { entry_time: currentTime } : { exit_time: currentTime })
-        } as any;
-
-        const insertData = cadetId ? { ...baseData, cadet_id: cadetId } : baseData;
-
-        const { error } = await supabase
-          .from('cadet_attendance')
-          .insert(insertData);
-
-        if (error) throw error;
+      let cadetId = user?.cadet_id;
+      if (!cadetId) {
+        const { data: rpcCadetId } = await supabase.rpc('current_cadet_id');
+        cadetId = (rpcCadetId as string | null | undefined) || undefined;
       }
 
+  // First, upsert entry/exit time
+  const upsertData = {
+    practice_session_id: sessionId,
+    cadet_id: cadetId,
+    ...(type === 'entry' ? { entry_time: currentTime } : { exit_time: currentTime })
+  };
+  const { error: upsertError } = await supabase
+  .from('cadet_attendance')
+  .upsert([upsertData], { onConflict: 'practice_session_id,cadet_id' });
+      if (upsertError) throw upsertError;
+
+      // Fetch session duration and entry/exit times to recalculate attendance_percentage
+      const { data: sessionData } = await supabase
+        .from('practice_sessions')
+        .select('duration_minutes')
+        .eq('id', sessionId)
+        .single();
+      const { data: attendanceData } = await supabase
+        .from('cadet_attendance')
+        .select('id, entry_time, exit_time')
+        .eq('practice_session_id', sessionId)
+        .eq('cadet_id', cadetId)
+        .single();
+      let attendance_percentage = 0;
+      if (attendanceData?.entry_time && attendanceData?.exit_time && sessionData?.duration_minutes > 0) {
+        const [eh, em] = attendanceData.exit_time.split(":").map(Number);
+        const [sh, sm] = attendanceData.entry_time.split(":").map(Number);
+        const participation_minutes = (eh * 60 + em) - (sh * 60 + sm);
+        attendance_percentage = (participation_minutes / sessionData.duration_minutes) * 100;
+        if (attendance_percentage < 0) attendance_percentage = 0;
+        if (attendance_percentage > 100) attendance_percentage = 100;
+      }
+      // Update attendance_percentage in the record
+      await supabase
+        .from('cadet_attendance')
+        .update({ attendance_percentage })
+        .eq('practice_session_id', sessionId)
+        .eq('cadet_id', cadetId);
+
+      if (onAttendanceMarked) onAttendanceMarked();
       toast({
         title: "Success",
         description: `${type === 'entry' ? 'Entry' : 'Exit'} time marked successfully`,
       });
-
       fetchMyAttendance();
     } catch (error: any) {
       toast({
@@ -279,15 +326,21 @@ const CadetAttendanceMarking = () => {
         </CardHeader>
         <CardContent>
           {sessions.length === 0 ? (
-            <div className="text-center py-8 text-muted-foreground">
-              No upcoming practice sessions scheduled.
+            <div className="flex flex-col items-center justify-center py-8 text-muted-foreground gap-2">
+              <Calendar className="h-8 w-8" />
+              <p>No upcoming practice sessions scheduled.</p>
+              <p className="text-sm">Check back later for new sessions.</p>
             </div>
           ) : (
             <div className="space-y-6">
               {sessions.map((session) => {
                 const attendance = myAttendance[session.id];
                 const form = attendanceForm[session.id] || { entry_time: '', exit_time: '' };
-                const isPastSession = new Date(session.practice_date) < new Date();
+                // Only allow marking for today and future sessions
+                const sessionDate = new Date(session.practice_date);
+                const now = new Date();
+                now.setHours(0, 0, 0, 0);
+                const isPastSession = sessionDate < now;
                 
                 return (
                   <Card key={session.id} className="border-l-4 border-l-primary">
@@ -353,7 +406,6 @@ const CadetAttendanceMarking = () => {
                         {!isPastSession && (
                           <div className="lg:w-80 space-y-4">
                             <h4 className="font-medium">Mark Attendance</h4>
-                            
                             {/* Quick Mark Buttons */}
                             <div className="flex gap-2">
                               <Button
@@ -367,7 +419,7 @@ const CadetAttendanceMarking = () => {
                               </Button>
                               <Button
                                 onClick={() => markAttendance(session.id, 'exit')}
-                                disabled={isLoading || !attendance?.entry_time}
+                                disabled={isLoading}
                                 size="sm"
                                 variant="outline"
                                 className="flex items-center gap-2"
@@ -376,11 +428,20 @@ const CadetAttendanceMarking = () => {
                                 Mark Exit
                               </Button>
                             </div>
-                            
+                            <Button
+                              variant="outline"
+                              className="w-full mt-2"
+                              onClick={() => {
+                                setExcuseDialogSessionId(session.id);
+                                setExcuseText('');
+                              }}
+                              disabled={isLoading}
+                            >
+                              Submit Excuse Letter
+                            </Button>
                             <div className="text-xs text-muted-foreground">
                               Or enter times manually:
                             </div>
-                            
                             {/* Manual Time Entry */}
                             <div className="grid grid-cols-2 gap-2">
                               <div className="space-y-1">
@@ -410,7 +471,6 @@ const CadetAttendanceMarking = () => {
                                 />
                               </div>
                             </div>
-                            
                             <Button
                               onClick={() => manualMarkAttendance(session.id)}
                               disabled={isLoading || !form.entry_time || !form.exit_time}
@@ -449,8 +509,9 @@ const CadetAttendanceMarking = () => {
             </div>
           ) : (
             <div className="space-y-4">
-              {sessions.filter(session => myAttendance[session.id]).map((session) => {
-                const attendance = myAttendance[session.id];
+              {Object.entries(myAttendance).map(([sessionId, attendance]) => {
+                const session = sessions.find(s => s.id === sessionId);
+                if (!session) return null;
                 return (
                   <div key={session.id} className="border rounded-lg p-4">
                     <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
@@ -466,7 +527,6 @@ const CadetAttendanceMarking = () => {
                         {getStatusBadge(attendance.attendance_status)}
                       </div>
                     </div>
-                    
                     <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mt-4 text-sm">
                       <div>
                         <span className="text-muted-foreground">Entry:</span>
@@ -492,6 +552,73 @@ const CadetAttendanceMarking = () => {
           )}
         </CardContent>
       </Card>
+
+      {/* Excuse Letter Submission Dialog (Hidden) */}
+      <div className="fixed inset-0 flex items-center justify-center z-50 pointer-events-none" style={{ display: excuseDialogSessionId ? 'flex' : 'none' }}>
+        <div className="bg-white rounded-lg shadow-lg p-6 max-w-sm w-full pointer-events-auto">
+          <h4 className="text-lg font-semibold mb-4">Submit Excuse Letter</h4>
+          <div className="mb-4">
+            <Label htmlFor="excuse-text" className="block text-sm font-medium mb-2">Reason for Absence</Label>
+            <textarea
+              id="excuse-text"
+              value={excuseText}
+              onChange={(e) => setExcuseText(e.target.value)}
+              placeholder="Enter your reason for absence"
+              className="w-full border rounded p-2 min-h-[80px] text-sm"
+              rows={3}
+            />
+          </div>
+          <div className="flex justify-end gap-2">
+            <Button
+              variant="outline"
+              onClick={() => setExcuseDialogSessionId(null)}
+              className="text-sm"
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={async () => {
+                if (!excuseDialogSessionId || !excuseText.trim()) return;
+                setExcuseSubmitting(true);
+                try {
+                  let cadetId = user?.cadet_id;
+                  if (!cadetId) {
+                    const { data: rpcCadetId } = await supabase.rpc('current_cadet_id');
+                    cadetId = rpcCadetId as string;
+                  }
+                  // Find session date
+                  const session = sessions.find(s => s.id === excuseDialogSessionId);
+                  const absentDate = session?.practice_date;
+                  // Insert into excuse_letters table
+                  const { error } = await supabase
+                    .from('excuse_letters')
+                    .insert([{
+                      cadet_id: cadetId,
+                      absent_dates: absentDate,
+                      reason: excuseText,
+                      number_of_days: 1,
+                      approval_status: false,
+                      eligibility: false
+                    }]);
+                  if (error) throw error;
+                  toast({ title: 'Success', description: 'Excuse letter submitted.' });
+                  setExcuseDialogSessionId(null);
+                  setExcuseText('');
+                  fetchMyAttendance();
+                } catch (error: any) {
+                  toast({ title: 'Error', description: error.message || 'Failed to submit excuse letter', variant: 'destructive' });
+                } finally {
+                  setExcuseSubmitting(false);
+                }
+              }}
+              disabled={excuseSubmitting}
+              className="text-sm"
+            >
+              {excuseSubmitting ? 'Submitting...' : 'Submit'}
+            </Button>
+          </div>
+        </div>
+      </div>
     </div>
   );
 };

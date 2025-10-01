@@ -1,3 +1,25 @@
+/* Custom select styles for dark mode accessibility */
+select, select:focus, select:active {
+  background-color: hsl(var(--background));
+  color: hsl(var(--foreground));
+  border-color: hsl(var(--input));
+}
+
+.dark select, .dark select:focus, .dark select:active {
+  background-color: hsl(var(--card));
+  color: hsl(var(--card-foreground));
+  border-color: hsl(var(--input));
+}
+
+select option {
+  background-color: hsl(var(--card));
+  color: hsl(var(--card-foreground));
+}
+
+.dark select option {
+  background-color: hsl(var(--card));
+  color: hsl(var(--card-foreground));
+}
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
