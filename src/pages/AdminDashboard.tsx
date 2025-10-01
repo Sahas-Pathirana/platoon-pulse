@@ -379,28 +379,19 @@ const AdminDashboard = () => {
       }).select().single();
       if (insertError) throw insertError;
 
-      // Create user account using the Supabase Edge Function
+      // Create user account using the Supabase Edge Function (uses logged-in admin auth)
       try {
-        const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-        const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
-        
-        const response = await fetch(`${supabaseUrl}/functions/v1/create-cadet-user`, {
-          method: 'POST',
-          headers: { 
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${supabaseAnonKey}`,
-          },
-          body: JSON.stringify({
+        const { data: fnData, error: fnError } = await supabase.functions.invoke('create-cadet-user', {
+          body: {
             email: selectedCadetForApproval.email,
-            password: selectedCadetForApproval.application_number,
+            password: selectedCadetForApproval.temporary_password || selectedCadetForApproval.application_number,
             fullName: selectedCadetForApproval.name_full,
             cadetId: inserted.id,
-          }),
+          },
         });
 
-        if (!response.ok) {
-          const errorData = await response.json();
-          console.error('User creation failed:', errorData);
+        if (fnError) {
+          console.error('User creation failed:', fnError);
           // Continue with approval even if user creation fails
         }
       } catch (userError) {

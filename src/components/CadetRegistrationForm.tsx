@@ -309,6 +309,7 @@ export const CadetRegistrationForm = ({ onSuccess }: CadetRegistrationFormProps)
           battalion_informed: formData.battalionInformed,
           battalion_acceptance: formData.battalionAcceptance,
           email: formData.email,
+          temporary_password: formData.password,
         })
         .select()
         .single();
