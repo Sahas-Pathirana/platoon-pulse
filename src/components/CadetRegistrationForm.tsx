@@ -183,11 +183,11 @@ export const CadetRegistrationForm = ({ onSuccess }: CadetRegistrationFormProps)
       const fileExt = file.name.split('.').pop();
       const fileName = `profile_${Date.now()}.${fileExt}`;
       const { error } = await supabase.storage
-        .from('profile-photos')
+        .from('cadet-photos')
         .upload(fileName, file, { upsert: true });
       if (error) throw error;
       const { data: { publicUrl } } = supabase.storage
-        .from('profile-photos')
+        .from('cadet-photos')
         .getPublicUrl(fileName);
       return publicUrl;
     } catch (error) {
