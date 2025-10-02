@@ -238,6 +238,7 @@ export const CadetRegistrationForm = ({ onSuccess }: CadetRegistrationFormProps)
     if (!formData.dateOfBirth) errors.push("Date of Birth is required");
     if (!formData.email) errors.push("Email is required");
     if (!formData.password) errors.push("Password is required");
+    if (formData.password && formData.password.length < 6) errors.push("Password must be at least 6 characters");
     
     // Regiment number validation
     if (formData.regimentNo && !validateRegimentNumber(formData.regimentNo)) {
@@ -510,9 +511,10 @@ export const CadetRegistrationForm = ({ onSuccess }: CadetRegistrationFormProps)
                   <Input
                     id="password"
                     type="password"
+                    minLength={6}
                     value={formData.password}
                     onChange={(e) => updateFormData('password', e.target.value)}
-                    placeholder="Temporary password"
+                    placeholder="Temporary password (min 6 characters)"
                     required
                   />
                 </div>

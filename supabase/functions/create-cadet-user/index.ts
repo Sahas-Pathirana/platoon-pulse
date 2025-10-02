@@ -37,17 +37,17 @@ Deno.serve(async (req: Request): Promise<Response> => {
     // Get the request body
     const { email, password, fullName, cadetId }: CreateCadetUserRequest = await req.json()
 
-    // Normalize password to satisfy Supabase minimum length (6)
+    // Use the provided temporary password as-is; enforce minimum length
     const rawPwd = String(password ?? '')
-    let safePassword = rawPwd
-    if (rawPwd.length < 6) {
-      if (rawPwd.length === 0) {
-        // Generate a random 8-char password if none provided
-        safePassword = Math.random().toString(36).slice(2, 10)
-      } else {
-        // Pad with zeros to reach minimum length
-        safePassword = rawPwd.padEnd(6, '0')
-      }
+    const safePassword = rawPwd
+    if (safePassword.length < 6) {
+      return new Response(
+        JSON.stringify({ error: 'Password must be at least 6 characters' }),
+        {
+          status: 400,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        }
+      )
     }
 
     // Validate required fields

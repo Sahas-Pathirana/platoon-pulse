@@ -331,6 +331,7 @@ const AdminDashboard = () => {
   const [showPlatoonDialog, setShowPlatoonDialog] = useState(false);
   const [selectedCadetForApproval, setSelectedCadetForApproval] = useState<any>(null);
   const [selectedPlatoonForApproval, setSelectedPlatoonForApproval] = useState<string>('');
+  const [tempPasswordForApproval, setTempPasswordForApproval] = useState<string>('');
 
   // Fetch pending cadets
   const fetchPendingCadets = async () => {
@@ -350,6 +351,7 @@ const AdminDashboard = () => {
   const handleApproveCadet = async (cadet: any) => {
     setSelectedCadetForApproval(cadet);
     setSelectedPlatoonForApproval('');
+    setTempPasswordForApproval('');
     setShowPlatoonDialog(true);
   };
 
@@ -359,6 +361,14 @@ const AdminDashboard = () => {
       toast({
         title: "Error",
         description: "Please select a platoon",
+        variant: "destructive",
+      });
+      return;
+    }
+    if (!tempPasswordForApproval || tempPasswordForApproval.length < 6) {
+      toast({
+        title: "Error",
+        description: "Enter the cadet's temporary password (min 6 characters).",
         variant: "destructive",
       });
       return;
@@ -383,7 +393,7 @@ const AdminDashboard = () => {
       const { data: fnData, error: fnError } = await supabase.functions.invoke('create-cadet-user', {
         body: {
           email: selectedCadetForApproval.email,
-          password: selectedCadetForApproval.application_number,
+          password: tempPasswordForApproval,
           fullName: selectedCadetForApproval.name_full,
           cadetId: inserted.id,
         },
@@ -407,7 +417,7 @@ const AdminDashboard = () => {
       
       toast({ 
         title: 'Approved', 
-        description: `Cadet ${selectedCadetForApproval.name_full} approved and assigned to ${selectedPlatoonForApproval === 'none' ? 'No Platoon' : selectedPlatoonForApproval}. Initial password: ${initialPassword}` 
+        description: `Cadet ${selectedCadetForApproval.name_full} approved and assigned to ${selectedPlatoonForApproval === 'none' ? 'No Platoon' : selectedPlatoonForApproval}.` 
       });
       
       // Update UI immediately by removing from pending cadets list
@@ -2033,6 +2043,17 @@ const AdminDashboard = () => {
                 <SelectItem value="none">None</SelectItem>
               </SelectContent>
             </Select>
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="temp-password">Temporary Password</Label>
+            <Input
+              id="temp-password"
+              type="password"
+              value={tempPasswordForApproval}
+              onChange={(e) => setTempPasswordForApproval(e.target.value)}
+              placeholder="Enter cadet's temporary password"
+            />
+            <p className="text-xs text-muted-foreground">This must match the password the cadet set during registration.</p>
           </div>
         </div>
         <DialogFooter>
