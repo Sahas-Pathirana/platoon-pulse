@@ -275,16 +275,32 @@ export const CadetRegistrationForm = ({ onSuccess }: CadetRegistrationFormProps)
     setIsLoading(true);
 
     try {
-      // Upload profile photo first (if any)
+      // Step 1: Create unconfirmed auth user
+      const { data: authData, error: authError } = await supabase.functions.invoke('create-unconfirmed-cadet', {
+        body: {
+          email: formData.email,
+          password: formData.password,
+          fullName: formData.fullName
+        }
+      });
+
+      if (authError || !authData?.success) {
+        throw new Error(authData?.error || authError?.message || 'Failed to create account');
+      }
+
+      const authUserId = authData.userId;
+
+      // Step 2: Upload profile photo (if any)
       let photoUrl: string | null = null;
       if (formData.profilePhoto) {
         photoUrl = await uploadProfilePhoto();
       }
 
-      // Insert into pending_cadets for admin approval
+      // Step 3: Insert into pending_cadets for admin approval
       const { data: cadetData, error: cadetError } = await supabase
         .from('pending_cadets')
         .insert({
+          auth_user_id: authUserId,
           name_full: formData.fullName,
           name_with_initials: formData.nameWithInitials || formData.fullName,
           application_number: formData.applicationNumber,
@@ -316,7 +332,7 @@ export const CadetRegistrationForm = ({ onSuccess }: CadetRegistrationFormProps)
 
       if (cadetError) throw cadetError;
 
-      // Create family contacts record
+      // Step 4: Create family contacts record
       if (formData.fatherName || formData.motherName || formData.guardianName) {
         await supabase.from('family_contacts').insert({
           cadet_id: cadetData.id,
@@ -333,7 +349,7 @@ export const CadetRegistrationForm = ({ onSuccess }: CadetRegistrationFormProps)
         });
       }
 
-      // Create medical records if provided
+      // Step 5: Create medical records if provided
       if (formData.medicalCertificateUrl || formData.medicalIssuanceParty) {
         await supabase.from('medical_records').insert({
           cadet_id: cadetData.id,
@@ -344,10 +360,9 @@ export const CadetRegistrationForm = ({ onSuccess }: CadetRegistrationFormProps)
         });
       }
 
-      // Create auth account
       toast({
         title: "Success",
-        description: `Cadet registration submitted for admin approval.`,
+        description: "Registration submitted! You can login once an admin approves your account.",
       });
 
       // Reset form

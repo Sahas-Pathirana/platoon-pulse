@@ -627,6 +627,7 @@ export type Database = {
         Row: {
           age: number | null
           application_number: string
+          auth_user_id: string | null
           battalion_acceptance: boolean | null
           battalion_acceptance_date: string | null
           battalion_informed: boolean | null
@@ -665,6 +666,7 @@ export type Database = {
         Insert: {
           age?: number | null
           application_number: string
+          auth_user_id?: string | null
           battalion_acceptance?: boolean | null
           battalion_acceptance_date?: string | null
           battalion_informed?: boolean | null
@@ -703,6 +705,7 @@ export type Database = {
         Update: {
           age?: number | null
           application_number?: string
+          auth_user_id?: string | null
           battalion_acceptance?: boolean | null
           battalion_acceptance_date?: string | null
           battalion_informed?: boolean | null

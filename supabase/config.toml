@@ -1,1 +1,10 @@
 project_id = "egzfmxwigwuhmpgqzjib"
+
+[functions.create-cadet-user]
+verify_jwt = false
+
+[functions.create-unconfirmed-cadet]
+verify_jwt = false
+
+[functions.confirm-cadet-account]
+verify_jwt = true
