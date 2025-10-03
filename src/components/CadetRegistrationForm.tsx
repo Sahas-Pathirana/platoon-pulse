@@ -483,7 +483,7 @@ export const CadetRegistrationForm = ({
                 
                 <div className="space-y-2">
                   <Label htmlFor="password">Account Password *</Label>
-                  <Input id="password" type="password" minLength={6} value={formData.password} onChange={e => updateFormData('password', e.target.value)} placeholder="Temporary password (min 6 characters)" required />
+                  <Input id="password" type="password" minLength={6} value={formData.password} onChange={e => updateFormData('password', e.target.value)} placeholder="Account password (min 6 characters)" required />
                 </div>
                 
                 <div className="space-y-2">
