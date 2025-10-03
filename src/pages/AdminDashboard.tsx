@@ -1367,7 +1367,7 @@ const AdminDashboard = () => {
                         {/* Dynamically render all keys as columns, except id, created_at, updated_at, and excluded fields */}
                         {pendingCadets.length > 0 && Object.keys(pendingCadets[0])
                           .filter(key => ![
-                            'id','created_at','updated_at',
+                            'id','created_at','updated_at','auth_user_id',
                             'date_joined_practices','date_left_practices','withdrawal_letter_type','withdrawal_date_from','withdrawal_date_to','withdrawal_reason','withdrawal_approved','battalion_informed','battalion_acceptance','battalion_acceptance_date','master_remarks','rector_recommendations'
                           ].includes(key))
                           .map((key) => (
@@ -1382,7 +1382,7 @@ const AdminDashboard = () => {
                           {/* Render all fields dynamically except id, created_at, updated_at */}
                           {Object.keys(cadet)
                             .filter(key => ![
-                              'id','created_at','updated_at',
+                              'id','created_at','updated_at','auth_user_id',
                               'date_joined_practices','date_left_practices','withdrawal_letter_type','withdrawal_date_from','withdrawal_date_to','withdrawal_reason','withdrawal_approved','battalion_informed','battalion_acceptance','battalion_acceptance_date','master_remarks','rector_recommendations'
                             ].includes(key))
                             .map((key) => (
