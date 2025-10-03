@@ -184,8 +184,10 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
-import { Users, UserPlus, Shield, Edit, Trash2, FileText, Download, Calendar, Award, AlertTriangle } from "lucide-react";
+import { Users, UserPlus, Shield, Edit, Trash2, FileText, Download, Calendar, Award, AlertTriangle, TrendingUp, CheckCircle2 } from "lucide-react";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { SidebarProvider } from "@/components/ui/sidebar";
+import { AdminSidebar } from "@/components/AdminSidebar";
 
 // Move ReportDialog to top-level, outside AdminDashboard
 function ReportDialog({ generateReport, downloadAllSessionsAttendanceCSV, downloadAllTrainingAttendanceCSV }: {
@@ -1330,31 +1332,184 @@ const AdminDashboard = () => {
     }
   };
 
+  const [activeView, setActiveView] = useState("overview");
+
   return (
     <div className="min-h-screen bg-background">
       <Navigation />
 
-      <div className="max-w-7xl mx-auto px-2 sm:px-6 lg:px-8 py-8">
-        <div className="mb-10 pt-6 pb-6 sm:pt-10 sm:pb-10 flex flex-col items-center sm:items-start max-w-full sm:max-w-fit mx-auto w-full sm:w-auto">
-          <h2 className="text-2xl sm:text-3xl font-bold text-foreground text-center sm:text-left">Admin Dashboard</h2>
-          <p className="text-muted-foreground mt-3 text-center sm:text-left">
-            Manage cadet accounts and information
-          </p>
-        </div>
+      <SidebarProvider>
+        <div className="flex w-full min-h-screen">
+          <AdminSidebar activeTab={activeView} onTabChange={setActiveView} />
 
-        {/* Pending Cadets Approval Section */}
-        <div className="mb-10 w-full">
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <AlertTriangle className="h-5 w-5 text-yellow-500" />
-                Pending Cadet Approvals
-              </CardTitle>
-              <CardDescription>
-                Review and approve or reject new cadet registrations
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
+          <main className="flex-1 overflow-auto">
+            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+              {activeView === "overview" && (
+                <>
+                  <div className="mb-8">
+                    <h2 className="text-3xl font-bold text-foreground">Dashboard Overview</h2>
+                    <p className="text-muted-foreground mt-2">
+                      Welcome to the Cadet Management System
+                    </p>
+                  </div>
+
+                  {/* Enhanced Stats Cards */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+                    <Card className="border-l-4 border-l-blue-500">
+                      <CardContent className="p-6">
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <p className="text-sm font-medium text-muted-foreground">Total Cadets</p>
+                            <h3 className="text-3xl font-bold mt-2">{stats.totalCadets}</h3>
+                          </div>
+                          <div className="p-3 bg-blue-100 dark:bg-blue-900/20 rounded-full">
+                            <Users className="h-8 w-8 text-blue-600 dark:text-blue-400" />
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+
+                    <Card className="border-l-4 border-l-green-500">
+                      <CardContent className="p-6">
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <p className="text-sm font-medium text-muted-foreground">Recent Joins</p>
+                            <h3 className="text-3xl font-bold mt-2">{stats.recentJoins}</h3>
+                          </div>
+                          <div className="p-3 bg-green-100 dark:bg-green-900/20 rounded-full">
+                            <TrendingUp className="h-8 w-8 text-green-600 dark:text-green-400" />
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+
+                    <Card className="border-l-4 border-l-orange-500">
+                      <CardContent className="p-6">
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <p className="text-sm font-medium text-muted-foreground">Junior Platoon</p>
+                            <h3 className="text-3xl font-bold mt-2">{stats.juniorPlatoon}</h3>
+                          </div>
+                          <div className="p-3 bg-orange-100 dark:bg-orange-900/20 rounded-full">
+                            <Shield className="h-8 w-8 text-orange-600 dark:text-orange-400" />
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+
+                    <Card className="border-l-4 border-l-purple-500">
+                      <CardContent className="p-6">
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <p className="text-sm font-medium text-muted-foreground">Senior Platoon</p>
+                            <h3 className="text-3xl font-bold mt-2">{stats.seniorPlatoon}</h3>
+                          </div>
+                          <div className="p-3 bg-purple-100 dark:bg-purple-900/20 rounded-full">
+                            <Shield className="h-8 w-8 text-purple-600 dark:text-purple-400" />
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  </div>
+
+                  {/* Pending Approvals Section */}
+                  {pendingCadets.length > 0 && (
+                    <Card className="mb-8 border-l-4 border-l-yellow-500">
+                      <CardHeader>
+                        <CardTitle className="flex items-center gap-2">
+                          <AlertTriangle className="h-5 w-5 text-yellow-600" />
+                          Pending Cadet Approvals
+                        </CardTitle>
+                        <CardDescription>
+                          {pendingCadets.length} registration(s) awaiting approval
+                        </CardDescription>
+                      </CardHeader>
+                      <CardContent>
+                        <Button 
+                          onClick={() => setActiveView("cadets")}
+                          variant="outline"
+                        >
+                          Review Pending Cadets
+                        </Button>
+                      </CardContent>
+                    </Card>
+                  )}
+
+                  {/* Quick Actions */}
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                    <Card className="cursor-pointer hover:shadow-lg transition-shadow" onClick={() => setActiveView("cadets")}>
+                      <CardContent className="p-6">
+                        <div className="flex flex-col items-center text-center space-y-4">
+                          <div className="p-4 bg-blue-100 dark:bg-blue-900/20 rounded-full">
+                            <UserPlus className="h-8 w-8 text-blue-600 dark:text-blue-400" />
+                          </div>
+                          <div>
+                            <h3 className="font-semibold text-lg">Manage Cadets</h3>
+                            <p className="text-sm text-muted-foreground mt-1">
+                              Create, edit, and manage cadet records
+                            </p>
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+
+                    <Card className="cursor-pointer hover:shadow-lg transition-shadow" onClick={() => setActiveView("attendance")}>
+                      <CardContent className="p-6">
+                        <div className="flex flex-col items-center text-center space-y-4">
+                          <div className="p-4 bg-green-100 dark:bg-green-900/20 rounded-full">
+                            <Calendar className="h-8 w-8 text-green-600 dark:text-green-400" />
+                          </div>
+                          <div>
+                            <h3 className="font-semibold text-lg">Attendance</h3>
+                            <p className="text-sm text-muted-foreground mt-1">
+                              Track and manage attendance records
+                            </p>
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+
+                    <Card className="cursor-pointer hover:shadow-lg transition-shadow" onClick={() => setActiveView("reports")}>
+                      <CardContent className="p-6">
+                        <div className="flex flex-col items-center text-center space-y-4">
+                          <div className="p-4 bg-purple-100 dark:bg-purple-900/20 rounded-full">
+                            <FileText className="h-8 w-8 text-purple-600 dark:text-purple-400" />
+                          </div>
+                          <div>
+                            <h3 className="font-semibold text-lg">Reports</h3>
+                            <p className="text-sm text-muted-foreground mt-1">
+                              Generate and download reports
+                            </p>
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  </div>
+                </>
+              )}
+
+              {activeView === "cadets" && (
+                <div>
+
+                  <div className="mb-8">
+                    <h2 className="text-3xl font-bold text-foreground">Cadet Management</h2>
+                    <p className="text-muted-foreground mt-2">
+                      Create, view, and manage cadet accounts
+                    </p>
+                  </div>
+
+                  {/* Pending Cadets Approval Section */}
+                  <Card className="mb-8">
+                    <CardHeader>
+                      <CardTitle className="flex items-center gap-2">
+                        <AlertTriangle className="h-5 w-5 text-yellow-500" />
+                        Pending Cadet Approvals
+                      </CardTitle>
+                      <CardDescription>
+                        Review and approve or reject new cadet registrations
+                      </CardDescription>
+                    </CardHeader>
+                    <CardContent>
               {isPendingLoading ? (
                 <div className="text-center py-6">Loading pending cadets...</div>
               ) : pendingCadets.length === 0 ? (
@@ -1409,84 +1564,22 @@ const AdminDashboard = () => {
                   </Table>
                 </div>
               )}
-            </CardContent>
-          </Card>
-        </div>
+                    </CardContent>
+                  </Card>
 
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-8 mb-10">
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Total Cadets</CardTitle>
-              <Users className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{stats.totalCadets}</div>
-              <p className="text-xs text-muted-foreground">Active cadet records</p>
-            </CardContent>
-          </Card>
-          
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Junior Platoon</CardTitle>
-              <Shield className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{stats.juniorPlatoon}</div>
-              <p className="text-xs text-muted-foreground">Ages 12-14</p>
-            </CardContent>
-          </Card>
-          
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Senior Platoon</CardTitle>
-              <Shield className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{stats.seniorPlatoon}</div>
-              <p className="text-xs text-muted-foreground">Ages 14-20</p>
-            </CardContent>
-          </Card>
+                  {/* Cadet Management Tabs */}
+                  <Tabs defaultValue="create-account" className="w-full">
+                    <TabsList className="grid w-full grid-cols-2 lg:grid-cols-4 mb-8">
+                      <TabsTrigger value="create-account">Create Account</TabsTrigger>
+                      <TabsTrigger value="manage-cadets">Manage Cadets</TabsTrigger>
+                      <TabsTrigger value="cadet-records">Cadet Records</TabsTrigger>
+                      <TabsTrigger value="promotions">Promotions</TabsTrigger>
+                    </TabsList>
 
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Recent Joins</CardTitle>
-              <Calendar className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{stats.recentJoins}</div>
-              <p className="text-xs text-muted-foreground">Last 30 days</p>
-            </CardContent>
-          </Card>
-        </div>
-
-  <div className="h-12 sm:h-16 lg:h-20" />
-  <Tabs defaultValue="create-account" className="w-full mt-6">
-          <div className="w-full mb-20 flex flex-col items-center">
-            <div className="relative w-full">
-              <div className="absolute left-0 top-0 w-full h-full bg-muted rounded-lg" />
-              <TabsList
-                className="flex flex-col w-full items-center justify-center min-h-[260px] sm:min-h-[60px] sm:flex-row sm:flex-wrap sm:gap-x-8 sm:gap-y-2 relative"
-                style={{ width: '100%' }}
-              >
-                <TabsTrigger value="create-account" className="block w-full sm:w-auto px-4 py-3 text-center">Create Cadet Account</TabsTrigger>
-                <TabsTrigger value="attendance" className="block w-full sm:w-auto px-4 py-3 text-center">Attendance Management</TabsTrigger>
-                <TabsTrigger value="manage-cadets" className="block w-full sm:w-auto px-4 py-3 text-center">Basic Cadet Management</TabsTrigger>
-                <TabsTrigger value="cadet-records" className="block w-full sm:w-auto px-4 py-3 text-center">Cadet Records Management</TabsTrigger>
-                <TabsTrigger value="reports" className="block w-full sm:w-auto px-4 py-3 text-center">Reports</TabsTrigger>
-              </TabsList>
-            </div>
-          </div>
-
-          
-            <TabsContent value="create-account">
-              <div className="mb-8 mt-28 sm:mt-12">
-                <CadetRegistrationForm onSuccess={fetchCadets} />
-              </div>
-            </TabsContent>
-
-          <TabsContent value="attendance">
-            <div className="mb-8 mt-16 sm:mt-0">
-              <AttendanceManagement />
+                    <TabsContent value="create-account">
+                      <CadetRegistrationForm onSuccess={fetchCadets} />
+                    </TabsContent>
+                    <TabsContent value="manage-cadets">
               {/* Excuse Letters Section for Admins */}
               <div className="mt-10">
                 <h3 className="text-lg font-semibold mb-4">Submitted Excuse Letters</h3>
@@ -1528,30 +1621,19 @@ const AdminDashboard = () => {
                     </TableBody>
                   </Table>
                 </div>
+                </div>
               </div>
-            </div>
-          </TabsContent>
+            </TabsContent>
 
-          <TabsContent value="manage-cadets">
-            <Card className="mb-8 mt-16 sm:mt-0">
-              <CardHeader className="pb-4">
-                <CardTitle>Basic Cadet Management</CardTitle>
-                <CardDescription>View and manage basic cadet information</CardDescription>
-              </CardHeader>
-               {/* Promotions Management Section */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Users className="h-5 w-5" />
-            Cadet Promotions
-          </CardTitle>
-          <CardDescription>
-            Select a cadet and give a promotion
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-6">
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 max-h-60 overflow-y-auto mb-4">
-            {cadets.map((cadet) => (
+            <TabsContent value="manage-cadets">
+              <Card>
+                <CardHeader>
+                  <CardTitle>Basic Cadet Information</CardTitle>
+                  <CardDescription>View and manage basic cadet details</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    {cadets.slice(0, 9).map((cadet) => (
               <Card
                 key={cadet.id}
                 className={`cursor-pointer transition-colors ${selectedCadet?.id === cadet.id ? 'ring-2 ring-primary' : 'hover:bg-muted'}`}
@@ -1567,9 +1649,22 @@ const AdminDashboard = () => {
                   </div>
                 </CardContent>
               </Card>
-            ))}
-          </div>
-          {selectedCadet && (
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card className="mt-6">
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <Users className="h-5 w-5" />
+                    Cadet Promotions
+                  </CardTitle>
+                  <CardDescription>
+                    Select a cadet and give a promotion
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
             <>
               <div className="border rounded-lg p-4 bg-muted">
                 <h3 className="font-semibold mb-2">Promote: {selectedCadet.name_full}</h3>
@@ -1661,10 +1756,12 @@ const AdminDashboard = () => {
                 </form>
               </div>
             </>
-          )}
-        </CardContent>
-      </Card>
-              <CardContent>
+                  )}
+                </CardContent>
+              </Card>
+
+              <Card className="mt-6">
+                <CardHeader>
                 <div className="space-y-6">
                   <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-4">
                     <h3 className="text-lg font-semibold">Cadet List ({cadets.length})</h3>
@@ -1793,50 +1890,152 @@ const AdminDashboard = () => {
                     </Table>
                   </div>
                 </div>
+                </CardContent>
+              </Card>
+            </TabsContent>
+
+            <TabsContent value="cadet-records">
+              <CadetManagement />
+            </TabsContent>
+
+            <TabsContent value="promotions">
+              <Card>
+                <CardHeader>
+                  <CardTitle>Promotions Management</CardTitle>
+                  <CardDescription>Track and manage cadet promotions</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <p className="text-muted-foreground">Promotion management features coming soon...</p>
+                </CardContent>
+              </Card>
+            </TabsContent>
+          </Tabs>
+        </div>
+      )}
+
+      {activeView === "attendance" && (
+        <div>
+          <div className="mb-8">
+            <h2 className="text-3xl font-bold text-foreground">Attendance Management</h2>
+            <p className="text-muted-foreground mt-2">
+              Track and manage cadet attendance
+            </p>
+          </div>
+          <AttendanceManagement />
+          
+          {/* Excuse Letters Section */}
+          <Card className="mt-8">
+            <CardHeader>
+              <CardTitle>Submitted Excuse Letters</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Cadet Name</TableHead>
+                    <TableHead>App No.</TableHead>
+                    <TableHead>Date</TableHead>
+                    <TableHead>Reason</TableHead>
+                    <TableHead>Status</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {Object.entries(excuseLetters).length === 0 && (
+                    <TableRow>
+                      <TableCell colSpan={5} className="text-center text-muted-foreground">
+                        No excuse letters submitted.
+                      </TableCell>
+                    </TableRow>
+                  )}
+                  {Object.entries(excuseLetters).map(([cadetId, letters]) => (
+                    letters.map((letter, idx) => {
+                      const cadet = cadets.find(c => c.id === cadetId);
+                      return (
+                        <TableRow key={letter.id || idx}>
+                          <TableCell>{cadet ? cadet.name_full : 'Unknown'}</TableCell>
+                          <TableCell>{cadet ? cadet.application_number : 'Unknown'}</TableCell>
+                          <TableCell>{new Date(letter.created_at).toLocaleDateString()}</TableCell>
+                          <TableCell>{letter.reason}</TableCell>
+                          <TableCell>
+                            <Badge variant={letter.status === 'approved' ? 'default' : letter.status === 'pending' ? 'secondary' : 'destructive'}>
+                              {letter.status ? letter.status.charAt(0).toUpperCase() + letter.status.slice(1) : 'Pending'}
+                            </Badge>
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })
+                  ))}
+                </TableBody>
+              </Table>
+            </CardContent>
+          </Card>
+        </div>
+      )}
+
+      {activeView === "performance" && (
+        <div>
+          <div className="mb-8">
+            <h2 className="text-3xl font-bold text-foreground">Performance Management</h2>
+            <p className="text-muted-foreground mt-2">
+              Track cadet performance and evaluations
+            </p>
+          </div>
+          <Card>
+            <CardContent className="p-6">
+              <p className="text-muted-foreground">Performance tracking features coming soon...</p>
+            </CardContent>
+          </Card>
+        </div>
+      )}
+
+      {activeView === "reports" && (
+        <div>
+          <div className="mb-8">
+            <h2 className="text-3xl font-bold text-foreground">Reports</h2>
+            <p className="text-muted-foreground mt-2">
+              Generate various reports and analytics
+            </p>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            {/* Cadet Report Card */}
+            <Card className="cursor-pointer hover:shadow-md transition-shadow">
+              <CardContent className="p-6 text-center">
+                <div className="flex flex-col items-center space-y-4">
+                  <div className="p-3 bg-primary/10 rounded-full">
+                    <FileText className="h-8 w-8 text-primary" />
+                  </div>
+                  <div>
+                    <h3 className="font-semibold text-lg">Cadet Report</h3>
+                    <p className="text-sm text-muted-foreground">
+                      Complete list of all cadets
+                    </p>
+                  </div>
+                  <ReportDialog 
+                    generateReport={generateReport} 
+                    downloadAllSessionsAttendanceCSV={downloadAllSessionsAttendanceCSV} 
+                    downloadAllTrainingAttendanceCSV={downloadAllTrainingAttendanceCSV} 
+                  />
+                </div>
               </CardContent>
             </Card>
-          </TabsContent>
 
-          <TabsContent value="cadet-records">
-            <div className="mt-16 sm:mt-0">
-              <CadetManagement />
-            </div>
-          </TabsContent>
-
-          <TabsContent value="reports">
-  <div className="mt-16 sm:mt-0">
-    <div className="mb-8">
-      <h2 className="text-xl font-bold">Reports</h2>
-      <p className="text-muted-foreground">Generate various reports and analytics</p>
-    </div>
-    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-      {/* Cadet Report Card */}
-      <Card className="cursor-pointer hover:shadow-md transition-shadow">
-        <CardContent className="p-6 text-center">
-          <div className="flex flex-col items-center space-y-4">
-            <div className="p-3 bg-primary/10 rounded-full">
-              <FileText className="h-8 w-8 text-primary" />
-            </div>
-            <div>
-              <h3 className="font-semibold text-lg">Cadet Report</h3>
-              <p className="text-sm text-muted-foreground">
-                Complete list of all cadets with basic information
-              </p>
-            </div>
-            <ReportDialog 
-              generateReport={generateReport} 
-              downloadAllSessionsAttendanceCSV={downloadAllSessionsAttendanceCSV} 
-              downloadAllTrainingAttendanceCSV={downloadAllTrainingAttendanceCSV} 
-            />
-          </div>
-        </CardContent>
-      </Card>
-      {/* Achievements Report Card */}
-      <Card className="cursor-pointer hover:shadow-md transition-shadow">
-        <CardContent className="p-6 text-center">
-          <div className="flex flex-col items-center space-y-4">
-            <div className="p-3 bg-yellow-100 dark:bg-yellow-900/20 rounded-full">
-              <Award className="h-8 w-8 text-yellow-600 dark:text-yellow-400" />
+            {/* Achievements Report Card */}
+            <Card className="cursor-pointer hover:shadow-md transition-shadow">
+              <CardContent className="p-6 text-center">
+                <div className="flex flex-col items-center space-y-4">
+                  <div className="p-3 bg-yellow-100 dark:bg-yellow-900/20 rounded-full">
+                    <Award className="h-8 w-8 text-yellow-600 dark:text-yellow-400" />
+                  </div>
+                  <div>
+                    <h3 className="font-semibold text-lg">Achievements Report</h3>
+                    <p className="text-sm text-muted-foreground">
+                      Achievements by cadet or platoon
+                    </p>
+                  </div>
+                  <AchievementsReportDialog />
+                </div>
+              </CardContent>
+            </Card>
             </div>
             <div>
               <h3 className="font-semibold text-lg">Achievements Report</h3>
@@ -1908,29 +2107,8 @@ const AdminDashboard = () => {
                     {isGeneratingPDF ? 'Generating...' : 'Generate PDF'}
                   </Button>
                 </div>
-              </DialogContent>
             </Dialog>
-          </div>
-        </CardContent>
-      </Card>
-      {/* Attendance Report Card */}
-      <Card className="cursor-pointer hover:shadow-md transition-shadow">
-        <CardContent className="p-6 text-center">
-          <div className="flex flex-col items-center space-y-4">
-            <div className="p-3 bg-blue-100 dark:bg-blue-900/20 rounded-full">
-              <Calendar className="h-8 w-8 text-blue-600 dark:text-blue-400" />
-            </div>
-            <div>
-              <h3 className="font-semibold text-lg">Attendance Report</h3>
-              <p className="text-sm text-muted-foreground">
-                Attendance statistics and records
-              </p>
-            </div>
-            <Button variant="outline" onClick={() => setIsAttendanceReportDialogOpen(true)}>
-              <Download className="h-4 w-4 mr-2" />
-              Download Report
-            </Button>
-            {/* Attendance Report Dialog (single instance) */}
+
             <Dialog open={isAttendanceReportDialogOpen} onOpenChange={setIsAttendanceReportDialogOpen}>
               <DialogContent>
                 <DialogHeader>
@@ -1986,41 +2164,34 @@ const AdminDashboard = () => {
                   >Download</Button>
                 </div>
               </DialogContent>
+              </DialogContent>
             </Dialog>
           </div>
-        </CardContent>
-      </Card>
-      {/* Performance Report Card */}
-      <Card className="cursor-pointer hover:shadow-md transition-shadow">
-        <CardContent className="p-6 text-center">
-          <div className="flex flex-col items-center space-y-4">
-            <div className="p-3 bg-green-100 dark:bg-green-900/20 rounded-full">
-              <Award className="h-8 w-8 text-green-600 dark:text-green-400" />
-            </div>
-            <div>
-              <h3 className="font-semibold text-lg">Performance Report</h3>
-              <p className="text-sm text-muted-foreground">
-                Performance evaluations and rankings
-              </p>
-            </div>
-            <Button 
-              className="w-full" 
-              variant="outline"
-              onClick={() => generateReport('performance')}
-            >
-              <Download className="h-4 w-4 mr-2" />
-              Generate Report
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
-    </div>
-  </div>
-</TabsContent>
-    </Tabs>
+        </div>
+      )}
 
-    {/* Platoon Selection Dialog for Cadet Approval */}
-    <Dialog open={showPlatoonDialog} onOpenChange={setShowPlatoonDialog}>
+      {activeView === "settings" && (
+        <div>
+          <div className="mb-8">
+            <h2 className="text-3xl font-bold text-foreground">Settings</h2>
+            <p className="text-muted-foreground mt-2">
+              Configure system settings
+            </p>
+          </div>
+          <Card>
+            <CardContent className="p-6">
+              <p className="text-muted-foreground">Settings panel coming soon...</p>
+            </CardContent>
+          </Card>
+        </div>
+      )}
+    </div>
+  </main>
+</div>
+</SidebarProvider>
+
+{/* Platoon Selection Dialog for Cadet Approval */}
+<Dialog open={showPlatoonDialog} onOpenChange={setShowPlatoonDialog}>
       <DialogContent>
         <DialogHeader>
           <DialogTitle>Select Platoon</DialogTitle>
@@ -2054,7 +2225,6 @@ const AdminDashboard = () => {
       </DialogContent>
     </Dialog>
   </div>
-</div>
   );
 }
 export default AdminDashboard;
