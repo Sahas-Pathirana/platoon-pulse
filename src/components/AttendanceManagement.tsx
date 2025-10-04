@@ -79,6 +79,12 @@ const AttendanceManagement = () => {
   const [filterTo, setFilterTo] = useState("");
   const [filterPlatoon, setFilterPlatoon] = useState("");
   const [filterCadet, setFilterCadet] = useState("");
+  
+  // Mark attendance state
+  const [isMarkAttendanceDialogOpen, setIsMarkAttendanceDialogOpen] = useState(false);
+  const [cadets, setCadets] = useState<Array<{ id: string; name_full: string; application_number: string; platoon: string }>>([]);
+  const [selectedCadetId, setSelectedCadetId] = useState("");
+  const [attendanceForm, setAttendanceForm] = useState({ entry_time: '', exit_time: '' });
   const { toast } = useToast();
   const { user } = useAuth();
   const [isLoading, setIsLoading] = useState(false);
@@ -96,7 +102,26 @@ const AttendanceManagement = () => {
 
   useEffect(() => {
     fetchPracticeSessions();
+    fetchCadets();
   }, []);
+
+  const fetchCadets = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('cadets')
+        .select('id, name_full, application_number, platoon')
+        .order('name_full');
+      
+      if (error) throw error;
+      setCadets(data || []);
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: "Failed to fetch cadets: " + error.message,
+        variant: "destructive",
+      });
+    }
+  };
 
   const fetchPracticeSessions = async () => {
     try {
@@ -314,6 +339,67 @@ const AttendanceManagement = () => {
         return <Badge className="bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200">Absent</Badge>;
       default:
         return <Badge variant="secondary">Not Marked</Badge>;
+    }
+  };
+
+  const markCadetAttendance = async () => {
+    if (!selectedCadetId || !selectedSession) {
+      toast({
+        title: "Validation Error",
+        description: "Please select a cadet",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (!attendanceForm.entry_time || !attendanceForm.exit_time) {
+      toast({
+        title: "Validation Error",
+        description: "Please enter both entry and exit times",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (attendanceForm.entry_time >= attendanceForm.exit_time) {
+      toast({
+        title: "Validation Error",
+        description: "Exit time must be after entry time",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setIsLoading(true);
+    try {
+      const { error } = await supabase
+        .from('cadet_attendance')
+        .upsert({
+          practice_session_id: selectedSession.id,
+          cadet_id: selectedCadetId,
+          entry_time: attendanceForm.entry_time,
+          exit_time: attendanceForm.exit_time,
+        }, { onConflict: 'practice_session_id,cadet_id' });
+
+      if (error) throw error;
+
+      toast({
+        title: "Success",
+        description: "Attendance marked successfully",
+      });
+
+      setIsMarkAttendanceDialogOpen(false);
+      setSelectedCadetId("");
+      setAttendanceForm({ entry_time: '', exit_time: '' });
+      fetchAttendanceReport(selectedSession.id);
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: "Failed to mark attendance: " + error.message,
+        variant: "destructive",
+      });
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -540,14 +626,26 @@ const AttendanceManagement = () => {
                   {selectedSession.duration_minutes} minutes
                 </CardDescription>
               </div>
-              <Button 
-                onClick={() => setIsDownloadDialogOpen(true)}
-                className="flex items-center gap-2"
-                disabled={isLoading}
-              >
-                <Download className="h-4 w-4" />
-                Download Report
-              </Button>
+              <div className="flex gap-2">
+                <Button 
+                  onClick={() => setIsMarkAttendanceDialogOpen(true)}
+                  className="flex items-center gap-2"
+                  disabled={isLoading}
+                  variant="default"
+                >
+                  <Plus className="h-4 w-4" />
+                  Mark Attendance
+                </Button>
+                <Button 
+                  onClick={() => setIsDownloadDialogOpen(true)}
+                  className="flex items-center gap-2"
+                  disabled={isLoading}
+                  variant="outline"
+                >
+                  <Download className="h-4 w-4" />
+                  Download Report
+                </Button>
+              </div>
             </div>
           </CardHeader>
           <CardContent>
@@ -625,22 +723,30 @@ const AttendanceManagement = () => {
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {attendanceRecords.map((record) => (
-                        <TableRow key={record.id || `${record.application_number}-${selectedSession.id}`}>
-                          <TableCell className="font-medium">{record.cadet_name}</TableCell>
-                          <TableCell>{record.application_number}</TableCell>
-                          <TableCell>
-                            <Badge variant={record.platoon === 'Junior' ? 'secondary' : 'default'}>
-                              {record.platoon || 'N/A'}
-                            </Badge>
+                      {attendanceRecords.length === 0 ? (
+                        <TableRow>
+                          <TableCell colSpan={8} className="text-center text-muted-foreground py-8">
+                            No attendance records yet. Click "Mark Attendance" to add records.
                           </TableCell>
-                          <TableCell>{record.entry_time || '-'}</TableCell>
-                          <TableCell>{record.exit_time || '-'}</TableCell>
-                          <TableCell>{record.participation_minutes || 0} min</TableCell>
-                          <TableCell>{record.attendance_percentage.toFixed(1)}%</TableCell>
-                          <TableCell>{getStatusBadge(record.attendance_status)}</TableCell>
                         </TableRow>
-                      ))}
+                      ) : (
+                        attendanceRecords.map((record) => (
+                          <TableRow key={record.id || `${record.application_number}-${selectedSession.id}`}>
+                            <TableCell className="font-medium">{record.cadet_name}</TableCell>
+                            <TableCell>{record.application_number}</TableCell>
+                            <TableCell>
+                              <Badge variant={record.platoon === 'Junior' ? 'secondary' : 'default'}>
+                                {record.platoon || 'N/A'}
+                              </Badge>
+                            </TableCell>
+                            <TableCell>{record.entry_time || '-'}</TableCell>
+                            <TableCell>{record.exit_time || '-'}</TableCell>
+                            <TableCell>{record.participation_minutes || 0} min</TableCell>
+                            <TableCell>{record.attendance_percentage.toFixed(1)}%</TableCell>
+                            <TableCell>{getStatusBadge(record.attendance_status)}</TableCell>
+                          </TableRow>
+                        ))
+                      )}
                     </TableBody>
                   </Table>
                 </div>
@@ -649,6 +755,68 @@ const AttendanceManagement = () => {
           </CardContent>
         </Card>
       )}
+
+      {/* Mark Attendance Dialog */}
+      <Dialog open={isMarkAttendanceDialogOpen} onOpenChange={setIsMarkAttendanceDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Mark Cadet Attendance</DialogTitle>
+            <DialogDescription>
+              Select a cadet and enter their entry and exit times for {selectedSession?.title}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="cadet">Select Cadet *</Label>
+              <select
+                id="cadet"
+                className="w-full p-2 border rounded-md"
+                value={selectedCadetId}
+                onChange={(e) => setSelectedCadetId(e.target.value)}
+              >
+                <option value="">-- Select a cadet --</option>
+                {cadets.map(cadet => (
+                  <option key={cadet.id} value={cadet.id}>
+                    {cadet.name_full} ({cadet.application_number}) - {cadet.platoon || 'N/A'}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="entry_time">Entry Time *</Label>
+                <Input
+                  id="entry_time"
+                  type="time"
+                  value={attendanceForm.entry_time}
+                  onChange={(e) => setAttendanceForm({ ...attendanceForm, entry_time: e.target.value })}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="exit_time">Exit Time *</Label>
+                <Input
+                  id="exit_time"
+                  type="time"
+                  value={attendanceForm.exit_time}
+                  onChange={(e) => setAttendanceForm({ ...attendanceForm, exit_time: e.target.value })}
+                />
+              </div>
+            </div>
+          </div>
+          <div className="flex justify-end gap-2">
+            <Button variant="outline" onClick={() => {
+              setIsMarkAttendanceDialogOpen(false);
+              setSelectedCadetId("");
+              setAttendanceForm({ entry_time: '', exit_time: '' });
+            }}>
+              Cancel
+            </Button>
+            <Button onClick={markCadetAttendance} disabled={isLoading}>
+              {isLoading ? "Saving..." : "Mark Attendance"}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     {/* ...existing code... */}
   </div>
 );

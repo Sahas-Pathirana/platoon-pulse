@@ -402,35 +402,18 @@ const CadetAttendanceMarking = ({ onAttendanceMarked }: { onAttendanceMarked?: (
                           )}
                         </div>
 
-                        {/* Attendance Marking */}
+                        {/* Info Notice - Attendance is marked by admin */}
                         {!isPastSession && (
                           <div className="lg:w-80 space-y-4">
-                            <h4 className="font-medium">Mark Attendance</h4>
-                            {/* Quick Mark Buttons */}
-                            <div className="flex gap-2">
-                              <Button
-                                onClick={() => markAttendance(session.id, 'entry')}
-                                disabled={isLoading}
-                                size="sm"
-                                className="flex items-center gap-2"
-                              >
-                                <LogIn className="h-4 w-4" />
-                                Mark Entry
-                              </Button>
-                              <Button
-                                onClick={() => markAttendance(session.id, 'exit')}
-                                disabled={isLoading}
-                                size="sm"
-                                variant="outline"
-                                className="flex items-center gap-2"
-                              >
-                                <LogOut className="h-4 w-4" />
-                                Mark Exit
-                              </Button>
+                            <div className="bg-muted p-4 rounded-lg">
+                              <h4 className="font-medium mb-2 text-sm">Attendance Information</h4>
+                              <p className="text-xs text-muted-foreground">
+                                Your attendance is marked by administrators. Check back after the session to view your attendance record.
+                              </p>
                             </div>
                             <Button
                               variant="outline"
-                              className="w-full mt-2"
+                              className="w-full"
                               onClick={() => {
                                 setExcuseDialogSessionId(session.id);
                                 setExcuseText('');
@@ -439,46 +422,17 @@ const CadetAttendanceMarking = ({ onAttendanceMarked }: { onAttendanceMarked?: (
                             >
                               Submit Excuse Letter
                             </Button>
-                            <div className="text-xs text-muted-foreground">
-                              Or enter times manually:
+                          </div>
+                        )}
+                        
+                        {/* Show attendance marked message for past sessions */}
+                        {isPastSession && !attendance && (
+                          <div className="lg:w-80">
+                            <div className="bg-muted p-4 rounded-lg">
+                              <p className="text-xs text-muted-foreground">
+                                This session has ended. {attendance ? 'Your attendance record is displayed above.' : 'No attendance record found for this session.'}
+                              </p>
                             </div>
-                            {/* Manual Time Entry */}
-                            <div className="grid grid-cols-2 gap-2">
-                              <div className="space-y-1">
-                                <Label htmlFor={`entry-${session.id}`} className="text-xs">Entry Time</Label>
-                                <Input
-                                  id={`entry-${session.id}`}
-                                  type="time"
-                                  value={form.entry_time}
-                                  onChange={(e) => setAttendanceForm(prev => ({
-                                    ...prev,
-                                    [session.id]: { ...form, entry_time: e.target.value }
-                                  }))}
-                                  className="text-sm"
-                                />
-                              </div>
-                              <div className="space-y-1">
-                                <Label htmlFor={`exit-${session.id}`} className="text-xs">Exit Time</Label>
-                                <Input
-                                  id={`exit-${session.id}`}
-                                  type="time"
-                                  value={form.exit_time}
-                                  onChange={(e) => setAttendanceForm(prev => ({
-                                    ...prev,
-                                    [session.id]: { ...form, exit_time: e.target.value }
-                                  }))}
-                                  className="text-sm"
-                                />
-                              </div>
-                            </div>
-                            <Button
-                              onClick={() => manualMarkAttendance(session.id)}
-                              disabled={isLoading || !form.entry_time || !form.exit_time}
-                              size="sm"
-                              className="w-full"
-                            >
-                              {isLoading ? "Marking..." : "Submit Attendance"}
-                            </Button>
                           </div>
                         )}
                       </div>
